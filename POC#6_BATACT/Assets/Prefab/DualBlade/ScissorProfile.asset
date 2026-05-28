@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c03e1e19aeb873c43b96ce5cfa8e654a, type: 3}
+  m_Name: ScissorProfile
+  m_EditorClassIdentifier: Assembly-CSharp::WeaponHitboxProfile
+  state: 2
+  shape: 1
+  localOffset: {x: 0, y: 0}
+  boxSize: {x: 1.8, y: 0.45}
+  radius: 1.35
+  startupSeconds: 0.06
+  activeSeconds: 0.18
+  recoverySeconds: 0.24
+  reaction:
+    reactionType: 0
+    damage: 0
+    knockbackForce: 0
+    stunSeconds: 0
+    extraImpulse: {x: 0, y: 0}

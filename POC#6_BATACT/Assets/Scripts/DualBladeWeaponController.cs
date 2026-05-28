@@ -22,14 +22,15 @@ public sealed class DualBladeWeaponController : MonoBehaviour
     [SerializeField] private Vector3 scissorsPivotLocalPosition = new Vector3(0f, -0.45f, 0f);
 
     [Header("Form Poses")]
-    [SerializeField] private BladePose spearPose = new BladePose(0f, 180f, 1.45f);
-    [SerializeField] private BladePose boomerangPose = new BladePose(90f, 0f, 1f);
-    [SerializeField] private BladePose scissorsPose = new BladePose(35f, 145f, 0.75f);
+    [SerializeField] private BladePose spearPose = new BladePose(0f, 180f, 1.45f, 0.95f);
+    [SerializeField] private BladePose boomerangPose = new BladePose(90f, 0f, 1f, 0.45f);
+    [SerializeField] private BladePose scissorsPose = new BladePose(35f, -35f, 0.75f, 0.5f);
     [SerializeField] private float snapLerpSharpness = 40f;
 
     [Header("Input")]
     [SerializeField] private KeyCode boomerangSelectKey = KeyCode.Mouse2;
     [SerializeField] private KeyCode attackKey = KeyCode.Mouse0;
+    [SerializeField] private bool allowNumberKeyMorph = true;
     [SerializeField] private float perfectCatchInputWindow = 0.12f;
 
     public WeaponState CurrentState { get; private set; } = WeaponState.Boomerang;
@@ -43,6 +44,8 @@ public sealed class DualBladeWeaponController : MonoBehaviour
 
     private void Awake()
     {
+        UpgradeLegacyPoseDefaults();
+
         if (weaponRoot == null)
         {
             weaponRoot = transform;
@@ -59,6 +62,11 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         }
 
         ApplyFormInstant(CurrentState);
+    }
+
+    private void OnValidate()
+    {
+        UpgradeLegacyPoseDefaults();
     }
 
     private void Update()
@@ -104,6 +112,22 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         else if (Input.GetKeyDown(boomerangSelectKey))
         {
             requestedState = WeaponState.Boomerang;
+        }
+
+        if (allowNumberKeyMorph || Application.isEditor)
+        {
+            if (Input.GetKeyDown(KeyCode.Alpha1))
+            {
+                requestedState = WeaponState.Spear;
+            }
+            else if (Input.GetKeyDown(KeyCode.Alpha2))
+            {
+                requestedState = WeaponState.Boomerang;
+            }
+            else if (Input.GetKeyDown(KeyCode.Alpha3))
+            {
+                requestedState = WeaponState.Scissors;
+            }
         }
 
         if (!requestedState.HasValue)
@@ -293,10 +317,37 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         }
     }
 
+    private void UpgradeLegacyPoseDefaults()
+    {
+        if (spearPose.bladeDistanceFromPivot <= 0f)
+        {
+            spearPose.bladeDistanceFromPivot = 0.95f;
+        }
+
+        if (boomerangPose.bladeDistanceFromPivot <= 0f)
+        {
+            boomerangPose.bladeDistanceFromPivot = 0.45f;
+        }
+
+        if (scissorsPose.bladeDistanceFromPivot <= 0f)
+        {
+            scissorsPose.bladeDistanceFromPivot = 0.5f;
+        }
+
+        if (Mathf.Approximately(scissorsPose.upperBladeAngle, 35f) && Mathf.Approximately(scissorsPose.lowerBladeAngle, 145f))
+        {
+            scissorsPose.lowerBladeAngle = -35f;
+        }
+    }
+
     private void ApplyBladePose(BladePose pose, float t)
     {
+        float bladeDistance = pose.bladeDistanceFromPivot > 0f ? pose.bladeDistanceFromPivot : GetFallbackBladeDistance(pose.lengthScale);
+
         if (upperBlade != null)
         {
+            Vector3 upperDirection = GetLocalDirection(pose.upperBladeAngle);
+            upperBlade.localPosition = Vector3.Lerp(upperBlade.localPosition, upperDirection * bladeDistance, t);
             upperBlade.localRotation = Quaternion.Lerp(
                 upperBlade.localRotation,
                 Quaternion.Euler(0f, 0f, pose.upperBladeAngle),
@@ -306,12 +357,26 @@ public sealed class DualBladeWeaponController : MonoBehaviour
 
         if (lowerBlade != null)
         {
+            Vector3 lowerDirection = GetLocalDirection(pose.lowerBladeAngle);
+            lowerBlade.localPosition = Vector3.Lerp(lowerBlade.localPosition, lowerDirection * bladeDistance, t);
             lowerBlade.localRotation = Quaternion.Lerp(
                 lowerBlade.localRotation,
                 Quaternion.Euler(0f, 0f, pose.lowerBladeAngle),
                 t);
             lowerBlade.localScale = Vector3.Lerp(lowerBlade.localScale, new Vector3(pose.lengthScale, 1f, 1f), t);
         }
+    }
+
+    private static Vector3 GetLocalDirection(float angleDegrees)
+    {
+        float radians = angleDegrees * Mathf.Deg2Rad;
+        return new Vector3(Mathf.Cos(radians), Mathf.Sin(radians), 0f);
+    }
+
+    private static float GetFallbackBladeDistance(float lengthScale)
+    {
+        // 기존 씬에는 새 필드가 0으로 들어갈 수 있으므로, 구버전 세팅도 바로 보이게 안전값을 씁니다.
+        return Mathf.Max(0.35f, 0.65f * Mathf.Max(0.5f, lengthScale));
     }
 }
 
@@ -321,11 +386,13 @@ public struct BladePose
     public float upperBladeAngle;
     public float lowerBladeAngle;
     public float lengthScale;
+    public float bladeDistanceFromPivot;
 
-    public BladePose(float upperBladeAngle, float lowerBladeAngle, float lengthScale)
+    public BladePose(float upperBladeAngle, float lowerBladeAngle, float lengthScale, float bladeDistanceFromPivot)
     {
         this.upperBladeAngle = upperBladeAngle;
         this.lowerBladeAngle = lowerBladeAngle;
         this.lengthScale = lengthScale;
+        this.bladeDistanceFromPivot = bladeDistanceFromPivot;
     }
 }
