@@ -1,47 +1,87 @@
 using UnityEngine;
 
-public class CameraFollow2D : MonoBehaviour
+public sealed class CameraFollow2D : MonoBehaviour
 {
-    [Header("Target Settings")]
-    [Tooltip("카메라가 추적할 타겟 (Player Transform)")]
+    [Header("Target")]
     [SerializeField] private Transform target;
 
-    [Header("Follow Settings")]
-    [Tooltip("타겟과의 카메라 위치 오프셋 (보통 Z축 오프셋을 위해 사용)")]
-    [SerializeField] private Vector3 offset = new Vector3(0f, 0f, -10f);
+    [Header("Side View Follow")]
+    [SerializeField] private Vector3 offset = new Vector3(0f, 1.2f, -10f);
+    [SerializeField] private float smoothTime = 0.12f;
+    [SerializeField] private float lookAheadDistance = 1.8f;
+    [SerializeField] private float lookAheadSharpness = 6f;
+    [SerializeField] private bool keepCurrentZ = true;
 
-    [Tooltip("추적 반응 속도 (값이 작을수록 빠르고 정확하게 추적하며, 클수록 부드럽게 추적)")]
-    [SerializeField] private float smoothTime = 0.15f;
-
-    // smoothTime 연산에 필요한 내부 변수
-    private Vector3 currentVelocity = Vector3.zero;
+    private Vector3 velocity;
+    private float currentLookAhead;
+    private float lastTargetX;
+    private bool initialized;
 
     private void Start()
     {
-        // 씬 시작 시 타겟이 지정되어 있다면 카메라의 위치를 즉시 초기화하여 부자연스러운 움직임을 방지합니다.
-        if (target != null)
+        if (target == null)
         {
-            transform.position = target.position + offset;
+            return;
         }
+
+        lastTargetX = target.position.x;
+        SnapToTarget();
+        initialized = true;
     }
 
     private void LateUpdate()
     {
-        if (target == null) return;
+        if (target == null)
+        {
+            return;
+        }
 
-        // 목표 위치 계산 (타겟 위치 + 오프셋)
+        if (!initialized)
+        {
+            lastTargetX = target.position.x;
+            initialized = true;
+        }
+
+        float deltaX = target.position.x - lastTargetX;
+        float desiredLookAhead = Mathf.Abs(deltaX) > 0.0001f ? Mathf.Sign(deltaX) * lookAheadDistance : currentLookAhead;
+        float lookAheadT = 1f - Mathf.Exp(-lookAheadSharpness * Time.deltaTime);
+        currentLookAhead = Mathf.Lerp(currentLookAhead, desiredLookAhead, lookAheadT);
+
+        Vector3 targetPosition = target.position + offset + Vector3.right * currentLookAhead;
+        if (keepCurrentZ)
+        {
+            targetPosition.z = transform.position.z;
+        }
+
+        transform.position = Vector3.SmoothDamp(transform.position, targetPosition, ref velocity, smoothTime);
+        lastTargetX = target.position.x;
+    }
+
+    public void SetTarget(Transform newTarget, bool snap)
+    {
+        target = newTarget;
+        initialized = false;
+
+        if (snap)
+        {
+            SnapToTarget();
+        }
+    }
+
+    private void SnapToTarget()
+    {
+        if (target == null)
+        {
+            return;
+        }
+
         Vector3 targetPosition = target.position + offset;
+        if (keepCurrentZ)
+        {
+            targetPosition.z = transform.position.z;
+        }
 
-        // SmoothDamp를 이용하여 부드럽게 카메라 이동 처리
-        // 플레이어가 대시를 통해 갑자기 빨라져도 속도 비례 추적으로 매우 자연스럽게 따라갑니다.
-        Vector3 newPosition = Vector3.SmoothDamp(
-            transform.position,
-            targetPosition,
-            ref currentVelocity,
-            smoothTime
-        );
-
-        // 카메라의 새로운 위치 대입 (SmoothDamp 연산에 의해 Z축도 오프셋대로 정상 유지됨)
-        transform.position = newPosition;
+        transform.position = targetPosition;
+        velocity = Vector3.zero;
     }
 }

@@ -1,170 +1,249 @@
 using UnityEngine;
 
 [RequireComponent(typeof(Rigidbody2D))]
-public class PlayerTopDownMovement : MonoBehaviour
+[RequireComponent(typeof(CapsuleCollider2D))]
+public sealed class PlayerTopDownMovement : MonoBehaviour
 {
-    [Header("Movement Settings")]
-    [Tooltip("기본 이동 속도")]
-    [SerializeField] private float moveSpeed = 5f;
+    [Header("Side View Movement")]
+    [SerializeField] private float moveSpeed = 7f;
+    [SerializeField] private float acceleration = 70f;
+    [SerializeField] private float deceleration = 90f;
+    [SerializeField] private float airControlMultiplier = 0.65f;
 
-    [Header("Dash Settings")]
-    [Tooltip("대시 시 속도")]
-    [SerializeField] private float dashSpeed = 15f;
-    [Tooltip("대시 지속 시간 (초)")]
-    [SerializeField] private float dashDuration = 0.2f;
-    [Tooltip("대시 쿨타임 (초)")]
-    [SerializeField] private float dashCooldown = 1f;
+    [Header("Jump")]
+    [SerializeField] private KeyCode jumpKey = KeyCode.Space;
+    [SerializeField] private float jumpVelocity = 13f;
+    [SerializeField] private float coyoteTime = 0.1f;
+    [SerializeField] private float jumpBufferTime = 0.1f;
+    [SerializeField] private float fallGravityMultiplier = 1.8f;
+    [SerializeField] private float lowJumpGravityMultiplier = 2.2f;
 
-    [Header("Visual Root Reference")]
-    [Tooltip("마우스 방향을 바라볼 자식 오브젝트의 Transform (플레이어의 전체 transform 회전 방지)")]
+    [Header("Dash")]
+    [SerializeField] private KeyCode dashKey = KeyCode.LeftShift;
+    [SerializeField] private float dashSpeed = 18f;
+    [SerializeField] private float dashDuration = 0.16f;
+    [SerializeField] private float dashCooldown = 0.45f;
+    [SerializeField] private bool allowAirDash = true;
+
+    [Header("Ground Check")]
+    [SerializeField] private Transform groundCheck;
+    [SerializeField] private Vector2 groundCheckOffset = new Vector2(0f, -0.55f);
+    [SerializeField] private Vector2 groundCheckSize = new Vector2(0.75f, 0.12f);
+    [SerializeField] private LayerMask groundLayers = ~0;
+
+    [Header("Visual")]
     [SerializeField] private Transform visualRoot;
+    [SerializeField] private bool flipVisualByFacing = true;
 
-    // 컴포넌트 참조
-    private Rigidbody2D rb2d;
-    private Camera mainCamera;
+    public bool IsGrounded { get; private set; }
+    public bool IsDashing => dashTimer > 0f;
+    public int FacingSign { get; private set; } = 1;
 
-    // 입력 및 상태 변수
-    private Vector2 moveInput;
-    private Vector2 lastLookDirection = Vector2.right;
-    
-    private bool isDashing;
-    private float dashTimeRemaining;
-    private float dashCooldownRemaining;
-    private Vector2 dashDirection;
+    private Rigidbody2D body;
+    private Collider2D[] ownColliders;
+    private readonly Collider2D[] groundHits = new Collider2D[8];
+    private float horizontalInput;
+    private float coyoteTimer;
+    private float jumpBufferTimer;
+    private float dashTimer;
+    private float dashCooldownTimer;
+    private bool hasAirDash;
+    private float defaultGravityScale;
 
     private void Awake()
     {
-        // Rigidbody2D 컴포넌트 캐싱
-        rb2d = GetComponent<Rigidbody2D>();
-    }
+        body = GetComponent<Rigidbody2D>();
+        ownColliders = GetComponents<Collider2D>();
+        defaultGravityScale = body.gravityScale;
 
-    private void Start()
-    {
-        // Main Camera 캐싱 및 태그 확인 경고
-        mainCamera = Camera.main;
-        if (mainCamera == null)
+        if (defaultGravityScale <= 0f)
         {
-            Debug.LogWarning("PlayerTopDownMovement: Scene에 'MainCamera' 태그가 지정된 카메라가 없습니다. 마우스 바라보기 기능이 오작동할 수 있습니다.");
+            defaultGravityScale = 3f;
+            body.gravityScale = defaultGravityScale;
         }
 
-        // visualRoot가 지정되지 않은 경우 경고
-        if (visualRoot == null)
-        {
-            Debug.LogWarning("PlayerTopDownMovement: Visual Root가 지정되지 않았습니다. 인스펙터에서 플레이어의 렌더러가 포함된 자식 오브젝트를 지정해주세요.");
-        }
+        body.freezeRotation = true;
     }
 
     private void Update()
     {
-        // 1. 이동 입력 읽기 (기본 Input Manager)
-        if (!isDashing)
+        horizontalInput = Input.GetAxisRaw("Horizontal");
+
+        if (Mathf.Abs(horizontalInput) > 0.01f)
         {
-            moveInput.x = Input.GetAxisRaw("Horizontal");
-            moveInput.y = Input.GetAxisRaw("Vertical");
-            moveInput = moveInput.normalized;
+            FacingSign = horizontalInput > 0f ? 1 : -1;
         }
 
-        // 2. 대시 쿨타임 갱신
-        if (dashCooldownRemaining > 0f)
+        if (Input.GetKeyDown(jumpKey))
         {
-            dashCooldownRemaining -= Time.deltaTime;
+            jumpBufferTimer = jumpBufferTime;
         }
 
-        // 3. 대시 입력 처리 (Space)
-        if (Input.GetKeyDown(KeyCode.Space) && !isDashing && dashCooldownRemaining <= 0f)
+        if (Input.GetKeyDown(dashKey))
         {
-            StartDash();
+            TryStartDash();
         }
 
-        // 4. 마우스 방향을 바라보도록 회전 처리
-        RotateVisualTowardsMouse();
+        jumpBufferTimer -= Time.deltaTime;
+        dashCooldownTimer -= Time.deltaTime;
+
+        UpdateVisualFacing();
     }
 
     private void FixedUpdate()
     {
-        // 5. Rigidbody2D 기반 이동 처리
-        if (isDashing)
+        UpdateGrounded();
+
+        if (IsDashing)
         {
-            PerformDashStep();
+            TickDash();
+            return;
+        }
+
+        ApplyHorizontalMovement();
+        TryConsumeJump();
+        ApplyBetterJumpGravity();
+    }
+
+    private void UpdateGrounded()
+    {
+        Vector2 center = groundCheck != null
+            ? (Vector2)groundCheck.position
+            : (Vector2)transform.position + groundCheckOffset;
+
+        IsGrounded = HasExternalGroundHit(center, groundCheckSize);
+
+        if (IsGrounded)
+        {
+            coyoteTimer = coyoteTime;
+            hasAirDash = true;
         }
         else
         {
-            PerformNormalMovement();
+            coyoteTimer -= Time.fixedDeltaTime;
         }
     }
 
-    /// <summary>
-    /// 대시 동작을 시작합니다.
-    /// </summary>
-    private void StartDash()
+    private bool HasExternalGroundHit(Vector2 center, Vector2 size)
     {
-        isDashing = true;
-        dashTimeRemaining = dashDuration;
-        dashCooldownRemaining = dashCooldown;
-
-        // 이동 입력이 있다면 입력 방향으로, 없다면 마지막으로 바라보던(마우스) 방향으로 대시합니다.
-        if (moveInput.sqrMagnitude > 0.001f)
+        int count = Physics2D.OverlapBoxNonAlloc(center, size, 0f, groundHits, groundLayers);
+        for (int i = 0; i < count; i++)
         {
-            dashDirection = moveInput.normalized;
+            Collider2D hit = groundHits[i];
+            if (hit != null && !hit.isTrigger && !IsOwnCollider(hit))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool IsOwnCollider(Collider2D hit)
+    {
+        for (int i = 0; i < ownColliders.Length; i++)
+        {
+            if (hit == ownColliders[i])
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void ApplyHorizontalMovement()
+    {
+        float targetVelocityX = horizontalInput * moveSpeed;
+        float control = IsGrounded ? 1f : airControlMultiplier;
+        float rate = Mathf.Abs(targetVelocityX) > 0.01f ? acceleration : deceleration;
+        float nextVelocityX = Mathf.MoveTowards(body.linearVelocity.x, targetVelocityX, rate * control * Time.fixedDeltaTime);
+
+        body.linearVelocity = new Vector2(nextVelocityX, body.linearVelocity.y);
+    }
+
+    private void TryConsumeJump()
+    {
+        if (jumpBufferTimer <= 0f || coyoteTimer <= 0f)
+        {
+            return;
+        }
+
+        jumpBufferTimer = 0f;
+        coyoteTimer = 0f;
+        body.linearVelocity = new Vector2(body.linearVelocity.x, jumpVelocity);
+    }
+
+    private void ApplyBetterJumpGravity()
+    {
+        if (body.linearVelocity.y < -0.01f)
+        {
+            body.gravityScale = defaultGravityScale * fallGravityMultiplier;
+        }
+        else if (body.linearVelocity.y > 0.01f && !Input.GetKey(jumpKey))
+        {
+            body.gravityScale = defaultGravityScale * lowJumpGravityMultiplier;
         }
         else
         {
-            dashDirection = lastLookDirection;
+            body.gravityScale = defaultGravityScale;
         }
     }
 
-    /// <summary>
-    /// 대시 상태에서의 물리 이동을 업데이트합니다.
-    /// </summary>
-    private void PerformDashStep()
+    private void TryStartDash()
     {
-        dashTimeRemaining -= Time.fixedDeltaTime;
-
-        if (dashTimeRemaining <= 0f)
+        if (dashCooldownTimer > 0f || IsDashing)
         {
-            isDashing = false;
-            // 대시가 끝난 뒤 미끄러짐을 줄이기 위해 속도 초기화
-            rb2d.linearVelocity = moveInput * moveSpeed;
+            return;
         }
-        else
+
+        if (!IsGrounded)
         {
-            // 대시 중에는 지정된 방향과 대시 속도로 Rigidbody2D 속도 갱신
-            // transform/rigidbody의 위치가 매 프레임 정상적으로 갱신되어 BoomerangProjectile이 완벽히 실시간 추적하게 합니다.
-            rb2d.linearVelocity = dashDirection * dashSpeed;
+            if (!allowAirDash || !hasAirDash)
+            {
+                return;
+            }
+
+            hasAirDash = false;
+        }
+
+        dashTimer = dashDuration;
+        dashCooldownTimer = dashCooldown;
+        body.gravityScale = 0f;
+        body.linearVelocity = new Vector2(FacingSign * dashSpeed, 0f);
+    }
+
+    private void TickDash()
+    {
+        dashTimer -= Time.fixedDeltaTime;
+        body.linearVelocity = new Vector2(FacingSign * dashSpeed, 0f);
+
+        if (dashTimer <= 0f)
+        {
+            body.gravityScale = defaultGravityScale;
+            body.linearVelocity = new Vector2(FacingSign * moveSpeed, 0f);
         }
     }
 
-    /// <summary>
-    /// 일반 상태에서의 물리 이동을 처리합니다.
-    /// </summary>
-    private void PerformNormalMovement()
+    private void UpdateVisualFacing()
     {
-        rb2d.linearVelocity = moveInput * moveSpeed;
+        if (!flipVisualByFacing || visualRoot == null)
+        {
+            return;
+        }
+
+        Vector3 scale = visualRoot.localScale;
+        scale.x = Mathf.Abs(scale.x) * FacingSign;
+        visualRoot.localScale = scale;
     }
 
-    /// <summary>
-    /// visualRoot가 마우스 커서의 세계 좌표 방향을 바라보도록 회전시킵니다.
-    /// </summary>
-    private void RotateVisualTowardsMouse()
+    private void OnDrawGizmosSelected()
     {
-        if (mainCamera == null || visualRoot == null) return;
+        Vector2 center = groundCheck != null
+            ? (Vector2)groundCheck.position
+            : (Vector2)transform.position + groundCheckOffset;
 
-        // 마우스의 스크린 좌표를 월드 좌표로 변환
-        Vector3 mouseWorldPosition = mainCamera.ScreenToWorldPoint(Input.mousePosition);
-        
-        // Z축을 0으로 맞추어 2D 평면 벡터 생성
-        Vector2 direction = new Vector2(mouseWorldPosition.x - transform.position.x, mouseWorldPosition.y - transform.position.y);
-
-        if (direction.sqrMagnitude > 0.001f)
-        {
-            direction.Normalize();
-            lastLookDirection = direction;
-
-            // 마우스 방향에 대응하는 회전 각도 계산 (Z축 회전)
-            float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
-            
-            // 플레이어 전체 Transform 대신 자식인 visualRoot만 회전
-            visualRoot.rotation = Quaternion.Euler(0f, 0f, angle);
-        }
+        Gizmos.color = Color.green;
+        Gizmos.DrawWireCube(center, groundCheckSize);
     }
 }
