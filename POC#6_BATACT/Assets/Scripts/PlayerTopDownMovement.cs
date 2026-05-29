@@ -23,6 +23,7 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
     [SerializeField] private float dashSpeed = 18f;
     [SerializeField] private float dashDuration = 0.16f;
     [SerializeField] private float dashCooldown = 0.45f;
+    [SerializeField] private float dashBufferTime = 0.1f;
     [SerializeField] private bool allowAirDash = true;
     [SerializeField] private bool dashUsesMoveInputFirst = true;
 
@@ -31,6 +32,9 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
     [SerializeField] private Vector2 groundCheckOffset = new Vector2(0f, -0.55f);
     [SerializeField] private Vector2 groundCheckSize = new Vector2(0.75f, 0.12f);
     [SerializeField] private LayerMask groundLayers = ~0;
+    [SerializeField] private bool useColliderGroundFallback = true;
+    [SerializeField] private float groundProbeDistance = 0.08f;
+    [SerializeField] private float minimumGroundNormalY = 0.45f;
 
     [Header("Visual")]
     [SerializeField] private Transform visualRoot;
@@ -41,12 +45,16 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
     public int FacingSign { get; private set; } = 1;
 
     private Rigidbody2D body;
+    private CapsuleCollider2D bodyCollider;
     private Collider2D[] ownColliders;
     private readonly Collider2D[] groundHits = new Collider2D[8];
+    private readonly RaycastHit2D[] groundCastHits = new RaycastHit2D[8];
+    private ContactFilter2D groundContactFilter;
     private float horizontalInput;
     private float coyoteTimer;
     private float jumpBufferTimer;
     private float dashTimer;
+    private float dashBufferTimer;
     private float dashCooldownTimer;
     private float catchStabilizeTimer;
     private float externalControlLockTimer;
@@ -58,8 +66,10 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
     private void Awake()
     {
         body = GetComponent<Rigidbody2D>();
-        ownColliders = GetComponents<Collider2D>();
+        bodyCollider = GetComponent<CapsuleCollider2D>();
+        ownColliders = GetComponentsInChildren<Collider2D>();
         defaultGravityScale = body.gravityScale;
+        ConfigureGroundContactFilter();
 
         if (defaultGravityScale <= 0f)
         {
@@ -100,10 +110,11 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
 
         if (Input.GetKeyDown(dashKey))
         {
-            TryStartDash();
+            dashBufferTimer = dashBufferTime;
         }
 
         jumpBufferTimer -= Time.deltaTime;
+        dashBufferTimer -= Time.deltaTime;
         dashCooldownTimer -= Time.deltaTime;
 
         UpdateVisualFacing();
@@ -112,6 +123,11 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
     private void FixedUpdate()
     {
         UpdateGrounded();
+
+        if (dashBufferTimer > 0f)
+        {
+            TryStartDash();
+        }
 
         if (externalControlLockTimer > 0f)
         {
@@ -136,7 +152,7 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
             ? (Vector2)groundCheck.position
             : (Vector2)transform.position + groundCheckOffset;
 
-        IsGrounded = HasExternalGroundHit(center, groundCheckSize);
+        IsGrounded = HasExternalGroundHit(center, groundCheckSize) || HasGroundCastHit();
 
         if (IsGrounded)
         {
@@ -149,6 +165,13 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
         }
     }
 
+    private void ConfigureGroundContactFilter()
+    {
+        groundContactFilter = new ContactFilter2D();
+        groundContactFilter.SetLayerMask(groundLayers);
+        groundContactFilter.useTriggers = false;
+    }
+
     private bool HasExternalGroundHit(Vector2 center, Vector2 size)
     {
         int count = Physics2D.OverlapBoxNonAlloc(center, size, 0f, groundHits, groundLayers);
@@ -156,6 +179,31 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
         {
             Collider2D hit = groundHits[i];
             if (hit != null && !hit.isTrigger && !IsOwnCollider(hit))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool HasGroundCastHit()
+    {
+        if (!useColliderGroundFallback || bodyCollider == null)
+        {
+            return false;
+        }
+
+        int count = bodyCollider.Cast(Vector2.down, groundContactFilter, groundCastHits, groundProbeDistance);
+        for (int i = 0; i < count; i++)
+        {
+            RaycastHit2D hit = groundCastHits[i];
+            if (hit.collider == null || hit.collider.isTrigger || IsOwnCollider(hit.collider))
+            {
+                continue;
+            }
+
+            if (hit.normal.y >= minimumGroundNormalY)
             {
                 return true;
             }
@@ -244,6 +292,7 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
         }
 
         dashTimer = dashDuration;
+        dashBufferTimer = 0f;
         dashCooldownTimer = dashCooldown;
         body.gravityScale = 0f;
         body.linearVelocity = new Vector2(dashSign * dashSpeed, 0f);
