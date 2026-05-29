@@ -349,6 +349,18 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
         body.AddForce(impulse, ForceMode2D.Impulse);
     }
 
+    public void ApplyWeaponVault(Vector2 impulse, float controlLockSeconds)
+    {
+        externalControlLockTimer = Mathf.Max(externalControlLockTimer, controlLockSeconds);
+        dashTimer = 0f;
+        dashBufferTimer = 0f;
+        body.gravityScale = defaultGravityScale;
+
+        Vector2 currentVelocity = body.linearVelocity;
+        body.linearVelocity = new Vector2(currentVelocity.x * 0.35f, Mathf.Max(0f, currentVelocity.y));
+        body.AddForce(impulse, ForceMode2D.Impulse);
+    }
+
     public void SetAimFacingSign(int sign)
     {
         hasAimFacingOverride = true;
