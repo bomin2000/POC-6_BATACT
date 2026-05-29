@@ -24,6 +24,7 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
     [SerializeField] private float dashDuration = 0.16f;
     [SerializeField] private float dashCooldown = 0.45f;
     [SerializeField] private bool allowAirDash = true;
+    [SerializeField] private bool dashUsesMoveInputFirst = true;
 
     [Header("Ground Check")]
     [SerializeField] private Transform groundCheck;
@@ -47,8 +48,11 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
     private float jumpBufferTimer;
     private float dashTimer;
     private float dashCooldownTimer;
+    private float catchStabilizeTimer;
     private bool hasAirDash;
     private float defaultGravityScale;
+    private bool hasAimFacingOverride;
+    private int aimFacingSign = 1;
 
     private void Awake()
     {
@@ -69,7 +73,16 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
     {
         horizontalInput = Input.GetAxisRaw("Horizontal");
 
-        if (Mathf.Abs(horizontalInput) > 0.01f)
+        if (catchStabilizeTimer > 0f)
+        {
+            catchStabilizeTimer -= Time.deltaTime;
+        }
+
+        if (hasAimFacingOverride)
+        {
+            FacingSign = aimFacingSign;
+        }
+        else if (Mathf.Abs(horizontalInput) > 0.01f)
         {
             FacingSign = horizontalInput > 0f ? 1 : -1;
         }
@@ -155,6 +168,11 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
     private void ApplyHorizontalMovement()
     {
         float targetVelocityX = horizontalInput * moveSpeed;
+        if (catchStabilizeTimer > 0f)
+        {
+            targetVelocityX = 0f;
+        }
+
         float control = IsGrounded ? 1f : airControlMultiplier;
         float rate = Mathf.Abs(targetVelocityX) > 0.01f ? acceleration : deceleration;
         float nextVelocityX = Mathf.MoveTowards(body.linearVelocity.x, targetVelocityX, rate * control * Time.fixedDeltaTime);
@@ -192,7 +210,7 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
 
     private void TryStartDash()
     {
-        if (dashCooldownTimer > 0f || IsDashing)
+        if (dashCooldownTimer > 0f || IsDashing || catchStabilizeTimer > 0f)
         {
             return;
         }
@@ -207,14 +225,29 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
             hasAirDash = false;
         }
 
+        int dashSign = FacingSign;
+        if (dashUsesMoveInputFirst && Mathf.Abs(horizontalInput) > 0.01f)
+        {
+            dashSign = horizontalInput > 0f ? 1 : -1;
+        }
+
         dashTimer = dashDuration;
         dashCooldownTimer = dashCooldown;
         body.gravityScale = 0f;
-        body.linearVelocity = new Vector2(FacingSign * dashSpeed, 0f);
+        body.linearVelocity = new Vector2(dashSign * dashSpeed, 0f);
+        FacingSign = dashSign;
     }
 
     private void TickDash()
     {
+        if (catchStabilizeTimer > 0f)
+        {
+            dashTimer = 0f;
+            body.gravityScale = defaultGravityScale;
+            body.linearVelocity = new Vector2(0f, body.linearVelocity.y);
+            return;
+        }
+
         dashTimer -= Time.fixedDeltaTime;
         body.linearVelocity = new Vector2(FacingSign * dashSpeed, 0f);
 
@@ -235,6 +268,26 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
         Vector3 scale = visualRoot.localScale;
         scale.x = Mathf.Abs(scale.x) * FacingSign;
         visualRoot.localScale = scale;
+    }
+
+    public void StabilizeAfterBoomerangCatch(float seconds)
+    {
+        catchStabilizeTimer = Mathf.Max(catchStabilizeTimer, seconds);
+        dashTimer = 0f;
+        dashCooldownTimer = Mathf.Max(dashCooldownTimer, 0.08f);
+        body.gravityScale = defaultGravityScale;
+        body.linearVelocity = new Vector2(0f, Mathf.Min(body.linearVelocity.y, jumpVelocity * 0.35f));
+    }
+
+    public void SetAimFacingSign(int sign)
+    {
+        hasAimFacingOverride = true;
+        aimFacingSign = sign >= 0 ? 1 : -1;
+    }
+
+    public void ClearAimFacingOverride()
+    {
+        hasAimFacingOverride = false;
     }
 
     private void OnDrawGizmosSelected()

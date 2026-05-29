@@ -21,6 +21,9 @@ public sealed class DualBladeWeaponController : MonoBehaviour
     [SerializeField] private bool forceWeaponRenderInFront = true;
     [SerializeField] private int weaponSortingOrder = 20;
 
+    [Header("Physics Safety")]
+    [SerializeField] private bool forceBladeCollidersAsTriggers = true;
+
     [Header("Pivot Anchors")]
     [SerializeField] private Vector3 spearPivotLocalPosition = new Vector3(0f, 0.45f, 0f);
     [SerializeField] private Vector3 boomerangPivotLocalPosition = Vector3.zero;
@@ -35,8 +38,14 @@ public sealed class DualBladeWeaponController : MonoBehaviour
     [Header("Input")]
     [SerializeField] private KeyCode boomerangSelectKey = KeyCode.Mouse2;
     [SerializeField] private KeyCode attackKey = KeyCode.Mouse0;
+    [SerializeField] private bool wheelCyclesThroughBoomerang = true;
     [SerializeField] private bool allowNumberKeyMorph = true;
     [SerializeField] private float perfectCatchInputWindow = 0.12f;
+    [SerializeField] private float catchStabilizeSeconds = 0.12f;
+
+    [Header("Side View Aiming")]
+    [SerializeField] private bool sideViewMirrorAim = true;
+    [SerializeField] private bool drivePlayerFacingFromAim = true;
 
     [Header("Melee Attack Animation")]
     [SerializeField] private float spearThrustDistance = 1.05f;
@@ -47,6 +56,17 @@ public sealed class DualBladeWeaponController : MonoBehaviour
     [SerializeField] private float scissorsCutCloseSeconds = 0.07f;
     [SerializeField] private float scissorsCutOpenSeconds = 0.13f;
     [SerializeField] private float scissorsCutLungeDistance = 0.25f;
+
+    [Header("Combo Buffer")]
+    [SerializeField] private bool enableComboBuffer = true;
+    [SerializeField] private float comboResetSeconds = 0.7f;
+    [SerializeField] private int spearComboCount = 3;
+    [SerializeField] private int scissorsComboCount = 2;
+    [SerializeField] private float bufferedInputWindow = 0.22f;
+    [SerializeField] private float[] spearThrustDistanceMultipliers = { 1f, 1.15f, 1.35f };
+    [SerializeField] private float[] spearStretchMultipliers = { 1f, 1.1f, 1.25f };
+    [SerializeField] private float[] scissorsLungeMultipliers = { 1f, 1.25f };
+    [SerializeField] private float[] scissorsCloseAngleByCombo = { 8f, 0f };
 
     public WeaponState CurrentState { get; private set; } = WeaponState.Boomerang;
     public WeaponState? QueuedState { get; private set; }
@@ -61,6 +81,12 @@ public sealed class DualBladeWeaponController : MonoBehaviour
     private float attackUpperAngleOffset;
     private float attackLowerAngleOffset;
     private float attackLengthScaleOffset;
+    private WeaponState comboState = WeaponState.Boomerang;
+    private int comboIndex;
+    private float lastComboTime = -999f;
+    private bool hasBufferedAttack;
+    private float bufferedAttackTime;
+    private PlayerTopDownMovement playerMovement;
 
     private void Awake()
     {
@@ -81,7 +107,9 @@ public sealed class DualBladeWeaponController : MonoBehaviour
             meleeHitbox.Initialize(transform);
         }
 
+        playerMovement = GetComponent<PlayerTopDownMovement>();
         ConfigureWeaponRenderers();
+        ConfigureBladeColliders();
         ApplyFormInstant(CurrentState);
     }
 
@@ -89,6 +117,7 @@ public sealed class DualBladeWeaponController : MonoBehaviour
     {
         UpgradeLegacyPoseDefaults();
         ConfigureWeaponRenderers();
+        ConfigureBladeColliders();
     }
 
     private void Update()
@@ -113,8 +142,42 @@ public sealed class DualBladeWeaponController : MonoBehaviour
 
         if (toMouse.sqrMagnitude > 0.0001f)
         {
-            aimDirection = toMouse.normalized;
-            weaponRoot.right = aimDirection;
+            if (sideViewMirrorAim)
+            {
+                int aimSign = toMouse.x >= 0f ? 1 : -1;
+                aimDirection = aimSign > 0 ? Vector2.right : Vector2.left;
+                ApplySideViewWeaponFacing(aimSign);
+            }
+            else
+            {
+                aimDirection = toMouse.normalized;
+                weaponRoot.right = aimDirection;
+            }
+        }
+    }
+
+    private void ApplySideViewWeaponFacing(int aimSign)
+    {
+        if (weaponRoot != null)
+        {
+            weaponRoot.localRotation = Quaternion.identity;
+            Vector3 scale = weaponRoot.localScale;
+            scale.x = Mathf.Abs(scale.x) * aimSign;
+            scale.y = Mathf.Abs(scale.y);
+            weaponRoot.localScale = scale;
+        }
+
+        if (drivePlayerFacingFromAim)
+        {
+            if (playerMovement == null)
+            {
+                playerMovement = GetComponent<PlayerTopDownMovement>();
+            }
+
+            if (playerMovement != null)
+            {
+                playerMovement.SetAimFacingSign(aimSign);
+            }
         }
     }
 
@@ -140,11 +203,11 @@ public sealed class DualBladeWeaponController : MonoBehaviour
 
         if (wheel > 0f)
         {
-            requestedState = WeaponState.Spear;
+            requestedState = wheelCyclesThroughBoomerang ? StepWheelState(1) : WeaponState.Spear;
         }
         else if (wheel < 0f)
         {
-            requestedState = WeaponState.Scissors;
+            requestedState = wheelCyclesThroughBoomerang ? StepWheelState(-1) : WeaponState.Scissors;
         }
         else if (Input.GetKeyDown(boomerangSelectKey))
         {
@@ -176,6 +239,41 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         RequestMorph(requestedState.Value);
     }
 
+    private WeaponState StepWheelState(int direction)
+    {
+        WeaponState baseState = QueuedState.HasValue ? QueuedState.Value : CurrentState;
+
+        if (baseState == WeaponState.BareHand)
+        {
+            baseState = visibleForm;
+        }
+
+        if (direction > 0)
+        {
+            switch (baseState)
+            {
+                case WeaponState.Scissors:
+                    return WeaponState.Boomerang;
+                case WeaponState.Boomerang:
+                    return WeaponState.Spear;
+                case WeaponState.Spear:
+                default:
+                    return WeaponState.Spear;
+            }
+        }
+
+        switch (baseState)
+        {
+            case WeaponState.Spear:
+                return WeaponState.Boomerang;
+            case WeaponState.Boomerang:
+                return WeaponState.Scissors;
+            case WeaponState.Scissors:
+            default:
+                return WeaponState.Scissors;
+        }
+    }
+
     private void ReadAttackInput()
     {
         if (!Input.GetKeyDown(attackKey))
@@ -193,19 +291,67 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         switch (CurrentState)
         {
             case WeaponState.Spear:
-                PlayMeleeVisualAnimation(WeaponState.Spear);
-                TryStartMeleeHitbox(spearProfile, WeaponState.Spear);
+                TryStartComboMeleeAttack(WeaponState.Spear, spearProfile);
                 break;
 
             case WeaponState.Scissors:
-                PlayMeleeVisualAnimation(WeaponState.Scissors);
-                TryStartMeleeHitbox(scissorsProfile, WeaponState.Scissors);
+                TryStartComboMeleeAttack(WeaponState.Scissors, scissorsProfile);
                 break;
 
             case WeaponState.Boomerang:
                 ThrowBoomerang();
                 break;
         }
+    }
+
+    private void TryStartComboMeleeAttack(WeaponState attackState, WeaponHitboxProfile profile)
+    {
+        if (enableComboBuffer && meleeAnimationRoutine != null)
+        {
+            hasBufferedAttack = true;
+            bufferedAttackTime = Time.time;
+            return;
+        }
+
+        int nextComboIndex = ResolveNextComboIndex(attackState);
+        StartMeleeAttack(attackState, profile, nextComboIndex);
+    }
+
+    private int ResolveNextComboIndex(WeaponState attackState)
+    {
+        int maxCombo = GetMaxComboCount(attackState);
+
+        if (comboState != attackState || Time.time - lastComboTime > comboResetSeconds)
+        {
+            comboState = attackState;
+            comboIndex = 0;
+            return comboIndex;
+        }
+
+        comboIndex = (comboIndex + 1) % Mathf.Max(1, maxCombo);
+        return comboIndex;
+    }
+
+    private int GetMaxComboCount(WeaponState attackState)
+    {
+        if (attackState == WeaponState.Spear)
+        {
+            return Mathf.Max(1, spearComboCount);
+        }
+
+        if (attackState == WeaponState.Scissors)
+        {
+            return Mathf.Max(1, scissorsComboCount);
+        }
+
+        return 1;
+    }
+
+    private void StartMeleeAttack(WeaponState attackState, WeaponHitboxProfile profile, int attackComboIndex)
+    {
+        PlayMeleeVisualAnimation(attackState, attackComboIndex);
+        TryStartMeleeHitbox(profile, attackState);
+        lastComboTime = Time.time;
     }
 
     private void TryStartMeleeHitbox(WeaponHitboxProfile profile, WeaponState attackState)
@@ -216,21 +362,31 @@ public sealed class DualBladeWeaponController : MonoBehaviour
             return;
         }
 
-        if (!meleeHitbox.TryAttack(profile, aimDirection))
+        if (!meleeHitbox.TryAttack(profile, aimDirection, GetAttackAnimationWorldOffset, true))
         {
             Debug.Log($"DualBladeWeaponController: {attackState} hitbox was skipped because another melee attack is still active.");
             return;
         }
     }
 
-    private void PlayMeleeVisualAnimation(WeaponState attackState)
+    private Vector2 GetAttackAnimationWorldOffset()
+    {
+        if (weaponRoot == null)
+        {
+            return attackPivotOffset;
+        }
+
+        return weaponRoot.TransformVector(attackPivotOffset);
+    }
+
+    private void PlayMeleeVisualAnimation(WeaponState attackState, int attackComboIndex)
     {
         if (meleeAnimationRoutine != null)
         {
             StopCoroutine(meleeAnimationRoutine);
         }
 
-        meleeAnimationRoutine = StartCoroutine(MeleeAnimationRoutine(attackState));
+        meleeAnimationRoutine = StartCoroutine(MeleeAnimationRoutine(attackState, attackComboIndex));
     }
 
     public void RequestMorph(WeaponState targetState)
@@ -281,6 +437,12 @@ public sealed class DualBladeWeaponController : MonoBehaviour
             Debug.Log("Perfect Catch: critical buff / dash cancel opportunity granted.");
         }
 
+        PlayerTopDownMovement movement = GetComponent<PlayerTopDownMovement>();
+        if (movement != null)
+        {
+            movement.StabilizeAfterBoomerangCatch(catchStabilizeSeconds);
+        }
+
         WeaponState nextState = QueuedState.HasValue ? QueuedState.Value : WeaponState.Boomerang;
         QueuedState = null;
         TransitionTo(nextState);
@@ -295,6 +457,9 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         }
 
         ClearAttackOffsets();
+        hasBufferedAttack = false;
+        comboState = nextState;
+        comboIndex = 0;
         CurrentState = nextState;
 
         if (nextState != WeaponState.BareHand)
@@ -428,32 +593,73 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         }
     }
 
-    private IEnumerator MeleeAnimationRoutine(WeaponState attackState)
+    private void ConfigureBladeColliders()
+    {
+        if (!forceBladeCollidersAsTriggers || weaponRoot == null)
+        {
+            return;
+        }
+
+        Collider2D[] colliders = weaponRoot.GetComponentsInChildren<Collider2D>(true);
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            colliders[i].isTrigger = true;
+        }
+    }
+
+    private IEnumerator MeleeAnimationRoutine(WeaponState attackState, int attackComboIndex)
     {
         ClearAttackOffsets();
 
         if (attackState == WeaponState.Spear)
         {
-            yield return SpearThrustAnimation();
+            yield return SpearThrustAnimation(attackComboIndex);
         }
         else if (attackState == WeaponState.Scissors)
         {
-            yield return ScissorsCutAnimation();
+            yield return ScissorsCutAnimation(attackComboIndex);
         }
 
         ClearAttackOffsets();
         meleeAnimationRoutine = null;
+        TryConsumeBufferedAttack(attackState);
     }
 
-    private IEnumerator SpearThrustAnimation()
+    private void TryConsumeBufferedAttack(WeaponState attackState)
     {
+        if (!enableComboBuffer || !hasBufferedAttack)
+        {
+            hasBufferedAttack = false;
+            return;
+        }
+
+        bool isFresh = Time.time - bufferedAttackTime <= bufferedInputWindow;
+        hasBufferedAttack = false;
+
+        if (!isFresh || CurrentState != attackState)
+        {
+            return;
+        }
+
+        WeaponHitboxProfile profile = attackState == WeaponState.Spear ? spearProfile : scissorsProfile;
+        int nextComboIndex = ResolveNextComboIndex(attackState);
+        StartMeleeAttack(attackState, profile, nextComboIndex);
+    }
+
+    private IEnumerator SpearThrustAnimation(int attackComboIndex)
+    {
+        float distanceMultiplier = GetComboArrayValue(spearThrustDistanceMultipliers, attackComboIndex, 1f);
+        float stretchMultiplier = GetComboArrayValue(spearStretchMultipliers, attackComboIndex, 1f);
+        float thrustDistance = spearThrustDistance * distanceMultiplier;
+        float thrustStretch = spearThrustStretch * stretchMultiplier;
+
         float elapsed = 0f;
         while (elapsed < spearThrustOutSeconds)
         {
             elapsed += Time.unscaledDeltaTime;
             float t = EaseOutCubic(Mathf.Clamp01(elapsed / spearThrustOutSeconds));
-            attackPivotOffset = Vector3.right * (spearThrustDistance * t);
-            attackLengthScaleOffset = spearThrustStretch * t;
+            attackPivotOffset = Vector3.right * (thrustDistance * t);
+            attackLengthScaleOffset = thrustStretch * t;
             yield return null;
         }
 
@@ -462,17 +668,19 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         {
             elapsed += Time.unscaledDeltaTime;
             float t = EaseInOutCubic(Mathf.Clamp01(elapsed / spearThrustBackSeconds));
-            attackPivotOffset = Vector3.right * Mathf.Lerp(spearThrustDistance, 0f, t);
-            attackLengthScaleOffset = Mathf.Lerp(spearThrustStretch, 0f, t);
+            attackPivotOffset = Vector3.right * Mathf.Lerp(thrustDistance, 0f, t);
+            attackLengthScaleOffset = Mathf.Lerp(thrustStretch, 0f, t);
             yield return null;
         }
     }
 
-    private IEnumerator ScissorsCutAnimation()
+    private IEnumerator ScissorsCutAnimation(int attackComboIndex)
     {
         BladePose basePose = scissorsPose;
-        float closeUpperOffset = scissorsCutCloseAngle - basePose.upperBladeAngle;
-        float closeLowerOffset = -scissorsCutCloseAngle - basePose.lowerBladeAngle;
+        float closeAngle = GetComboArrayValue(scissorsCloseAngleByCombo, attackComboIndex, scissorsCutCloseAngle);
+        float lungeDistance = scissorsCutLungeDistance * GetComboArrayValue(scissorsLungeMultipliers, attackComboIndex, 1f);
+        float closeUpperOffset = closeAngle - basePose.upperBladeAngle;
+        float closeLowerOffset = -closeAngle - basePose.lowerBladeAngle;
 
         float elapsed = 0f;
         while (elapsed < scissorsCutCloseSeconds)
@@ -481,7 +689,7 @@ public sealed class DualBladeWeaponController : MonoBehaviour
             float t = EaseOutCubic(Mathf.Clamp01(elapsed / scissorsCutCloseSeconds));
             attackUpperAngleOffset = closeUpperOffset * t;
             attackLowerAngleOffset = closeLowerOffset * t;
-            attackPivotOffset = Vector3.right * (scissorsCutLungeDistance * t);
+            attackPivotOffset = Vector3.right * (lungeDistance * t);
             yield return null;
         }
 
@@ -493,9 +701,20 @@ public sealed class DualBladeWeaponController : MonoBehaviour
             float remaining = 1f - t;
             attackUpperAngleOffset = closeUpperOffset * remaining;
             attackLowerAngleOffset = closeLowerOffset * remaining;
-            attackPivotOffset = Vector3.right * (scissorsCutLungeDistance * remaining);
+            attackPivotOffset = Vector3.right * (lungeDistance * remaining);
             yield return null;
         }
+    }
+
+    private static float GetComboArrayValue(float[] values, int index, float fallback)
+    {
+        if (values == null || values.Length == 0)
+        {
+            return fallback;
+        }
+
+        int safeIndex = Mathf.Clamp(index, 0, values.Length - 1);
+        return values[safeIndex];
     }
 
     private void ClearAttackOffsets()

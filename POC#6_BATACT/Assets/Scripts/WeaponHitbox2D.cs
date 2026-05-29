@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System;
 using UnityEngine;
 
 public sealed class WeaponHitbox2D : MonoBehaviour
@@ -22,17 +23,41 @@ public sealed class WeaponHitbox2D : MonoBehaviour
 
     public bool TryAttack(WeaponHitboxProfile profile, Vector2 attackForward)
     {
+        return TryAttack(profile, attackForward, null);
+    }
+
+    public bool TryAttack(WeaponHitboxProfile profile, Vector2 attackForward, Func<Vector2> dynamicWorldOffset)
+    {
+        return TryAttack(profile, attackForward, dynamicWorldOffset, false);
+    }
+
+    public bool TryAttack(WeaponHitboxProfile profile, Vector2 attackForward, Func<Vector2> dynamicWorldOffset, bool interruptCurrentAttack)
+    {
         if (profile == null || attackRoutine != null)
+        {
+            if (!interruptCurrentAttack)
+            {
+                return false;
+            }
+
+            if (attackRoutine != null)
+            {
+                StopCoroutine(attackRoutine);
+                attackRoutine = null;
+            }
+        }
+
+        if (profile == null)
         {
             return false;
         }
 
         currentProfile = profile;
-        attackRoutine = StartCoroutine(AttackRoutine(profile, attackForward.normalized));
+        attackRoutine = StartCoroutine(AttackRoutine(profile, attackForward.normalized, dynamicWorldOffset));
         return true;
     }
 
-    private IEnumerator AttackRoutine(WeaponHitboxProfile profile, Vector2 attackForward)
+    private IEnumerator AttackRoutine(WeaponHitboxProfile profile, Vector2 attackForward, Func<Vector2> dynamicWorldOffset)
     {
         hitThisSwing.Clear();
 
@@ -44,7 +69,7 @@ public sealed class WeaponHitbox2D : MonoBehaviour
         float endTime = Time.time + profile.activeSeconds;
         while (Time.time < endTime)
         {
-            TickOverlap(profile, attackForward);
+            TickOverlap(profile, attackForward, dynamicWorldOffset);
             yield return null;
         }
 
@@ -57,9 +82,9 @@ public sealed class WeaponHitbox2D : MonoBehaviour
         attackRoutine = null;
     }
 
-    private void TickOverlap(WeaponHitboxProfile profile, Vector2 attackForward)
+    private void TickOverlap(WeaponHitboxProfile profile, Vector2 attackForward, Func<Vector2> dynamicWorldOffset)
     {
-        Vector2 center = GetWorldCenter(profile, attackForward);
+        Vector2 center = GetWorldCenter(profile, attackForward, dynamicWorldOffset);
         int hitCount;
 
         if (profile.shape == HitboxShape.Circle)
@@ -96,13 +121,14 @@ public sealed class WeaponHitbox2D : MonoBehaviour
         }
     }
 
-    private Vector2 GetWorldCenter(WeaponHitboxProfile profile, Vector2 attackForward)
+    private Vector2 GetWorldCenter(WeaponHitboxProfile profile, Vector2 attackForward, Func<Vector2> dynamicWorldOffset = null)
     {
         Vector2 right = attackForward.sqrMagnitude > 0.0001f ? attackForward.normalized : Vector2.right;
         Vector2 up = new Vector2(-right.y, right.x);
         Vector2 origin = owner != null ? (Vector2)owner.position : (Vector2)transform.position;
+        Vector2 extraOffset = dynamicWorldOffset != null ? dynamicWorldOffset.Invoke() : Vector2.zero;
 
-        return origin + right * profile.localOffset.x + up * profile.localOffset.y;
+        return origin + extraOffset + right * profile.localOffset.x + up * profile.localOffset.y;
     }
 
     private void OnDrawGizmosSelected()

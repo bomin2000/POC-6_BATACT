@@ -14,11 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WeaponHitboxProfile
   state: 0
   shape: 0
-  localOffset: {x: 1.6, y: 0}
-  boxSize: {x: 2.8, y: 0.45}
+  localOffset: {x: 2.25, y: 0}
+  boxSize: {x: 1.5, y: 0.45}
   radius: 1.5
   startupSeconds: 0.04
-  activeSeconds: 0.08
+  activeSeconds: 0.12
   recoverySeconds: 0.16
   reaction:
     reactionType: 0

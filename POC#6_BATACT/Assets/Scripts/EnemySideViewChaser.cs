@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 [RequireComponent(typeof(Rigidbody2D))]
@@ -11,6 +12,12 @@ public sealed class EnemySideViewChaser : MonoBehaviour
     [SerializeField] private float moveSpeed = 3.2f;
     [SerializeField] private float stopDistance = 0.85f;
     [SerializeField] private float acceleration = 35f;
+    [SerializeField] private bool ignoreEnemyToEnemyCollision = true;
+
+    [Header("Crowd Separation")]
+    [SerializeField] private LayerMask enemyLayers = 1 << 3;
+    [SerializeField] private float separationRadius = 0.85f;
+    [SerializeField] private float separationStrength = 1.4f;
 
     [Header("Ground")]
     [SerializeField] private Vector2 groundCheckOffset = new Vector2(0f, -1f);
@@ -30,19 +37,43 @@ public sealed class EnemySideViewChaser : MonoBehaviour
     private Rigidbody2D body;
     private Collider2D[] ownColliders;
     private readonly Collider2D[] overlapHits = new Collider2D[8];
+    private readonly Collider2D[] separationHits = new Collider2D[12];
     private float hopCooldownTimer;
     private int facingSign = 1;
+    private bool externallyStunned;
+    private static readonly List<EnemySideViewChaser> ActiveEnemies = new List<EnemySideViewChaser>();
 
     private void Awake()
     {
         body = GetComponent<Rigidbody2D>();
-        ownColliders = GetComponents<Collider2D>();
+        ownColliders = GetComponentsInChildren<Collider2D>();
         body.freezeRotation = true;
 
         if (body.gravityScale <= 0f)
         {
             body.gravityScale = 3f;
         }
+
+        if (ignoreEnemyToEnemyCollision)
+        {
+            Physics2D.IgnoreLayerCollision(gameObject.layer, gameObject.layer, true);
+            ApplyLayerToChildren(gameObject.layer);
+        }
+    }
+
+    private void OnEnable()
+    {
+        if (!ActiveEnemies.Contains(this))
+        {
+            ActiveEnemies.Add(this);
+        }
+
+        IgnoreAllActiveEnemyCollisions();
+    }
+
+    private void OnDisable()
+    {
+        ActiveEnemies.Remove(this);
     }
 
     private void Start()
@@ -79,6 +110,12 @@ public sealed class EnemySideViewChaser : MonoBehaviour
             return;
         }
 
+        if (externallyStunned)
+        {
+            Decelerate();
+            return;
+        }
+
         float deltaX = target.position.x - transform.position.x;
         float distanceX = Mathf.Abs(deltaX);
 
@@ -94,9 +131,9 @@ public sealed class EnemySideViewChaser : MonoBehaviour
             return;
         }
 
-        float desiredVelocityX = facingSign * moveSpeed;
+        float desiredVelocityX = facingSign * moveSpeed + GetSeparationVelocityX();
         float nextVelocityX = Mathf.MoveTowards(body.linearVelocity.x, desiredVelocityX, acceleration * Time.fixedDeltaTime);
-        body.linearVelocity = new Vector2(nextVelocityX, body.linearVelocity.y);
+        body.linearVelocity = new Vector2(nextVelocityX, ClampVerticalEnemyStackVelocity(body.linearVelocity.y));
 
         if (hopWhenBlocked && IsGrounded() && IsBlockedAhead() && hopCooldownTimer <= 0f)
         {
@@ -110,6 +147,21 @@ public sealed class EnemySideViewChaser : MonoBehaviour
     public void SetTarget(Transform newTarget)
     {
         target = newTarget;
+    }
+
+    public void SetExternalStun(bool stunned)
+    {
+        externallyStunned = stunned;
+
+        if (stunned)
+        {
+            Decelerate();
+        }
+    }
+
+    public void RefreshEnemyCollisionIgnores()
+    {
+        IgnoreAllActiveEnemyCollisions();
     }
 
     private void Decelerate()
@@ -158,6 +210,121 @@ public sealed class EnemySideViewChaser : MonoBehaviour
         return false;
     }
 
+    private float ClampVerticalEnemyStackVelocity(float velocityY)
+    {
+        if (velocityY <= 0f || !IsEnemyBelowOrOverlapping())
+        {
+            return velocityY;
+        }
+
+        return Mathf.Min(velocityY, 0.5f);
+    }
+
+    private bool IsEnemyBelowOrOverlapping()
+    {
+        int count = Physics2D.OverlapCircleNonAlloc(transform.position, separationRadius, separationHits, enemyLayers);
+        for (int i = 0; i < count; i++)
+        {
+            Collider2D hit = separationHits[i];
+            if (hit == null || IsOwnCollider(hit))
+            {
+                continue;
+            }
+
+            float verticalDelta = hit.bounds.center.y - transform.position.y;
+            if (verticalDelta < 0.6f)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void ApplyLayerToChildren(int layer)
+    {
+        Transform[] children = GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < children.Length; i++)
+        {
+            children[i].gameObject.layer = layer;
+        }
+    }
+
+    private void IgnoreAllActiveEnemyCollisions()
+    {
+        if (!ignoreEnemyToEnemyCollision)
+        {
+            return;
+        }
+
+        for (int i = 0; i < ActiveEnemies.Count; i++)
+        {
+            EnemySideViewChaser other = ActiveEnemies[i];
+            if (other == null || other == this)
+            {
+                continue;
+            }
+
+            IgnoreCollisionWith(other);
+            other.IgnoreCollisionWith(this);
+        }
+    }
+
+    private void IgnoreCollisionWith(EnemySideViewChaser other)
+    {
+        if (other == null || ownColliders == null || other.ownColliders == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < ownColliders.Length; i++)
+        {
+            if (ownColliders[i] == null)
+            {
+                continue;
+            }
+
+            for (int j = 0; j < other.ownColliders.Length; j++)
+            {
+                if (other.ownColliders[j] != null)
+                {
+                    Physics2D.IgnoreCollision(ownColliders[i], other.ownColliders[j], true);
+                }
+            }
+        }
+    }
+
+    private float GetSeparationVelocityX()
+    {
+        if (separationRadius <= 0f || separationStrength <= 0f)
+        {
+            return 0f;
+        }
+
+        int count = Physics2D.OverlapCircleNonAlloc(transform.position, separationRadius, separationHits, enemyLayers);
+        float push = 0f;
+
+        for (int i = 0; i < count; i++)
+        {
+            Collider2D hit = separationHits[i];
+            if (hit == null || IsOwnCollider(hit))
+            {
+                continue;
+            }
+
+            float deltaX = transform.position.x - hit.transform.position.x;
+            if (Mathf.Abs(deltaX) < 0.001f)
+            {
+                deltaX = Random.value < 0.5f ? -0.1f : 0.1f;
+            }
+
+            float weight = 1f - Mathf.Clamp01(Mathf.Abs(deltaX) / separationRadius);
+            push += Mathf.Sign(deltaX) * weight * separationStrength;
+        }
+
+        return push;
+    }
+
     private void UpdateVisualFacing()
     {
         if (visualRoot == null)
@@ -177,5 +344,8 @@ public sealed class EnemySideViewChaser : MonoBehaviour
 
         Gizmos.color = Color.yellow;
         Gizmos.DrawWireCube((Vector2)transform.position + new Vector2(wallCheckOffset.x * facingSign, wallCheckOffset.y), wallCheckSize);
+
+        Gizmos.color = Color.cyan;
+        Gizmos.DrawWireSphere(transform.position, separationRadius);
     }
 }
