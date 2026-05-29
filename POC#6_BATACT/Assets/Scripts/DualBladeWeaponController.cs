@@ -119,6 +119,8 @@ public sealed class DualBladeWeaponController : MonoBehaviour
     private bool bladeTerrainContact;
     private Vector2 bladeTerrainContactPoint;
     private Vector2 bladeTerrainContactNormal = Vector2.up;
+    private float bladeTerrainContactDistance;
+    private float bladeTerrainAnchorDistance;
     private float lastSpearVaultTime = -999f;
     private WeaponState comboState = WeaponState.Boomerang;
     private int comboIndex;
@@ -587,8 +589,8 @@ public sealed class DualBladeWeaponController : MonoBehaviour
             return;
         }
 
-        float maxDistance = Vector2.Distance(bladeTerrainContactPoint, transform.position) + spearAnchorSlack;
-        playerMovement.SetWeaponAnchorConstraint(bladeTerrainContactPoint, maxDistance, spearAnchorKeepAliveSeconds);
+        float anchorDistance = bladeTerrainAnchorDistance + spearAnchorSlack;
+        playerMovement.SetWeaponAnchorConstraint(bladeTerrainContactPoint, anchorDistance, spearAnchorKeepAliveSeconds);
     }
 
     private void PlayMeleeVisualAnimation(WeaponState attackState, int attackComboIndex)
@@ -962,38 +964,39 @@ public sealed class DualBladeWeaponController : MonoBehaviour
     {
         float bladeDistance = Mathf.Max(0f, pose.bladeDistanceFromPivot);
         bladeTerrainContact = false;
+        bladeTerrainContactDistance = float.PositiveInfinity;
+        bladeTerrainAnchorDistance = 0f;
 
         if (upperBlade != null)
         {
             Vector3 upperDirection = GetLocalDirection(pose.upperBladeAngle);
-            BladeTerrainLimit limit = ResolveBladeTerrainLimit(upperDirection, bladeDistance, pose.lengthScale);
-            upperBlade.localPosition = Vector3.Lerp(upperBlade.localPosition, upperDirection * limit.distanceFromPivot, t);
+            DetectBladeTerrainContact(upperDirection, bladeDistance, pose.lengthScale);
+            upperBlade.localPosition = Vector3.Lerp(upperBlade.localPosition, upperDirection * bladeDistance, t);
             upperBlade.localRotation = Quaternion.Lerp(
                 upperBlade.localRotation,
                 Quaternion.Euler(0f, 0f, pose.upperBladeAngle),
                 t);
-            upperBlade.localScale = Vector3.Lerp(upperBlade.localScale, new Vector3(limit.lengthScale, 1f, 1f), t);
+            upperBlade.localScale = Vector3.Lerp(upperBlade.localScale, new Vector3(pose.lengthScale, 1f, 1f), t);
         }
 
         if (lowerBlade != null)
         {
             Vector3 lowerDirection = GetLocalDirection(pose.lowerBladeAngle);
-            BladeTerrainLimit limit = ResolveBladeTerrainLimit(lowerDirection, bladeDistance, pose.lengthScale);
-            lowerBlade.localPosition = Vector3.Lerp(lowerBlade.localPosition, lowerDirection * limit.distanceFromPivot, t);
+            DetectBladeTerrainContact(lowerDirection, bladeDistance, pose.lengthScale);
+            lowerBlade.localPosition = Vector3.Lerp(lowerBlade.localPosition, lowerDirection * bladeDistance, t);
             lowerBlade.localRotation = Quaternion.Lerp(
                 lowerBlade.localRotation,
                 Quaternion.Euler(0f, 0f, pose.lowerBladeAngle),
                 t);
-            lowerBlade.localScale = Vector3.Lerp(lowerBlade.localScale, new Vector3(limit.lengthScale, 1f, 1f), t);
+            lowerBlade.localScale = Vector3.Lerp(lowerBlade.localScale, new Vector3(pose.lengthScale, 1f, 1f), t);
         }
     }
 
-    private BladeTerrainLimit ResolveBladeTerrainLimit(Vector3 localDirection, float desiredDistance, float desiredScale)
+    private void DetectBladeTerrainContact(Vector3 localDirection, float desiredDistance, float desiredScale)
     {
-        BladeTerrainLimit result = new BladeTerrainLimit(desiredDistance, desiredScale);
         if (!clampBladeReachAgainstTerrain || weaponRoot == null)
         {
-            return result;
+            return;
         }
 
         Vector2 origin = weaponRoot.TransformPoint(GetPivotPosition(visibleForm) + attackPivotOffset);
@@ -1001,7 +1004,7 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         float desiredReach = desiredDistance + bladeCastBaseLength * Mathf.Max(0f, desiredScale);
         if (desiredReach <= 0.0001f || worldDirection.sqrMagnitude <= 0.0001f)
         {
-            return result;
+            return;
         }
 
         RaycastHit2D[] hits = Physics2D.CircleCastAll(
@@ -1030,18 +1033,19 @@ public sealed class DualBladeWeaponController : MonoBehaviour
 
         if (float.IsPositiveInfinity(closestDistance))
         {
-            return result;
+            return;
         }
 
-        float allowedReach = Mathf.Max(0f, closestDistance - weaponBlockSkin);
-        float halfBladeLength = bladeCastBaseLength * Mathf.Max(0f, desiredScale) * 0.5f;
-        result.distanceFromPivot = Mathf.Clamp(allowedReach - halfBladeLength, 0f, desiredDistance);
-        result.lengthScale = desiredScale;
+        if (closestDistance >= bladeTerrainContactDistance)
+        {
+            return;
+        }
 
         bladeTerrainContact = true;
+        bladeTerrainContactDistance = closestDistance;
         bladeTerrainContactPoint = closestHit.point;
         bladeTerrainContactNormal = closestHit.normal.sqrMagnitude > 0.0001f ? closestHit.normal : -worldDirection;
-        return result;
+        bladeTerrainAnchorDistance = Vector2.Distance(transform.position, origin + worldDirection * desiredReach);
     }
 
     private static Vector3 GetLocalDirection(float angleDegrees)
@@ -1071,17 +1075,5 @@ public struct BladePose
         this.lowerBladeAngle = lowerBladeAngle;
         this.lengthScale = lengthScale;
         this.bladeDistanceFromPivot = bladeDistanceFromPivot;
-    }
-}
-
-public struct BladeTerrainLimit
-{
-    public float distanceFromPivot;
-    public float lengthScale;
-
-    public BladeTerrainLimit(float distanceFromPivot, float lengthScale)
-    {
-        this.distanceFromPivot = distanceFromPivot;
-        this.lengthScale = lengthScale;
     }
 }
