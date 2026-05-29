@@ -5,8 +5,13 @@ using UnityEngine;
 
 public sealed class WeaponHitbox2D : MonoBehaviour
 {
+    [Header("Hitbox Target")]
     [SerializeField] private LayerMask targetLayers = ~0;
+    
+    [Header("Preview Settings")]
     [SerializeField] private bool drawGizmos = true;
+    [SerializeField] private DualBladeWeaponController weaponController;
+    [SerializeField] private Color previewColor = new Color(1f, 0.4f, 0f, 0.8f);
 
     private readonly Collider2D[] overlapBuffer = new Collider2D[32];
     private readonly HashSet<Collider2D> hitThisSwing = new HashSet<Collider2D>();
@@ -19,6 +24,10 @@ public sealed class WeaponHitbox2D : MonoBehaviour
     public void Initialize(Transform ownerTransform)
     {
         owner = ownerTransform;
+        if (weaponController == null)
+        {
+            weaponController = ownerTransform.GetComponent<DualBladeWeaponController>();
+        }
     }
 
     public bool TryAttack(WeaponHitboxProfile profile, Vector2 attackForward)
@@ -114,10 +123,10 @@ public sealed class WeaponHitbox2D : MonoBehaviour
             hitThisSwing.Add(target);
             Vector2 impulse = profile.reaction.BuildImpulse(
                 attackForward,
-                owner.position,
+                owner != null ? owner.position : transform.position,
                 target.bounds.center);
 
-            receiver.ReceiveWeaponHit(profile.reaction, impulse, owner.gameObject);
+            receiver.ReceiveWeaponHit(profile.reaction, impulse, owner != null ? owner.gameObject : gameObject);
         }
     }
 
@@ -131,25 +140,64 @@ public sealed class WeaponHitbox2D : MonoBehaviour
         return origin + extraOffset + right * profile.localOffset.x + up * profile.localOffset.y;
     }
 
-    private void OnDrawGizmosSelected()
+    private void OnDrawGizmos()
     {
-        if (!drawGizmos || currentProfile == null)
+        if (!drawGizmos)
+        {
+            return;
+        }
+
+        WeaponHitboxProfile previewProfile = currentProfile;
+
+        // If not actively attacking, preview the profile of the current weapon state
+        if (!IsAttacking)
+        {
+            if (weaponController == null)
+            {
+                weaponController = GetComponentInParent<DualBladeWeaponController>();
+            }
+
+            if (weaponController != null)
+            {
+                switch (weaponController.CurrentState)
+                {
+                    case WeaponState.Spear:
+                        previewProfile = weaponController.SpearProfile;
+                        break;
+                    case WeaponState.Boomerang:
+                        previewProfile = weaponController.BoomerangProfile;
+                        break;
+                    case WeaponState.Scissors:
+                        previewProfile = weaponController.ScissorsProfile;
+                        break;
+                }
+            }
+        }
+
+        if (previewProfile == null)
         {
             return;
         }
 
         Vector2 forward = owner != null ? owner.right : transform.right;
-        Vector2 center = GetWorldCenter(currentProfile, forward);
-        Gizmos.color = Color.red;
-
-        if (currentProfile.shape == HitboxShape.Circle)
+        
+        // Handle case where weaponRoot hasn't rotated yet but controller knows aim
+        if (weaponController != null && weaponController.WeaponRoot != null)
         {
-            Gizmos.DrawWireSphere(center, currentProfile.radius);
+            forward = weaponController.WeaponRoot.right;
+        }
+
+        Vector2 center = GetWorldCenter(previewProfile, forward);
+        Gizmos.color = previewColor;
+
+        if (previewProfile.shape == HitboxShape.Circle)
+        {
+            Gizmos.DrawWireSphere(center, previewProfile.radius);
         }
         else
         {
             Gizmos.matrix = Matrix4x4.TRS(center, Quaternion.FromToRotation(Vector3.right, forward), Vector3.one);
-            Gizmos.DrawWireCube(Vector3.zero, currentProfile.boxSize);
+            Gizmos.DrawWireCube(Vector3.zero, previewProfile.boxSize);
             Gizmos.matrix = Matrix4x4.identity;
         }
     }

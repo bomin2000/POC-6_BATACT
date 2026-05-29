@@ -17,6 +17,10 @@ public sealed class DualBladeWeaponController : MonoBehaviour
     [SerializeField] private WeaponHitboxProfile boomerangProfile;
     [SerializeField] private WeaponHitboxProfile scissorsProfile;
 
+    public WeaponHitboxProfile SpearProfile => spearProfile;
+    public WeaponHitboxProfile BoomerangProfile => boomerangProfile;
+    public WeaponHitboxProfile ScissorsProfile => scissorsProfile;
+
     [Header("Visual Debug")]
     [SerializeField] private bool forceWeaponRenderInFront = true;
     [SerializeField] private int weaponSortingOrder = 20;

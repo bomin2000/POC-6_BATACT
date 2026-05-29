@@ -14,7 +14,7 @@ TagManager:
   - Player
   - Ground
   - PlayerWeapon
-  - PlayerAttacHitBox
+  - PlayerAttackHitbox
   - WeaponTerrainProbe
   - EnemyAttackHitbox
   - Projectile

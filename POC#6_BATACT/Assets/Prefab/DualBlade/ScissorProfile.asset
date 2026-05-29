@@ -15,7 +15,7 @@ MonoBehaviour:
   state: 2
   shape: 1
   localOffset: {x: 0, y: 0}
-  boxSize: {x: 1.8, y: 0.45}
+  boxSize: {x: 3, y: 0.45}
   radius: 1.35
   startupSeconds: 0.06
   activeSeconds: 0.18
@@ -23,6 +23,6 @@ MonoBehaviour:
   reaction:
     reactionType: 0
     damage: 16
-    knockbackForce: 3
+    knockbackForce: 10
     stunSeconds: 0.45
     extraImpulse: {x: 0, y: 0}

@@ -30,6 +30,7 @@ public sealed class WeaponTerrainProbe2D : MonoBehaviour
     [SerializeField] private Vector3 debugDirection;
     [SerializeField] private float debugDistance;
     [SerializeField] private bool debugIsContact;
+    [SerializeField] private string debugContactDirection;
     [SerializeField] private Vector2 debugContactPoint;
     [SerializeField] private Vector2 debugContactNormal;
     [SerializeField] private string debugContactColliderName;
@@ -85,6 +86,7 @@ public sealed class WeaponTerrainProbe2D : MonoBehaviour
         ContactPoint = Vector2.zero;
         ContactNormal = Vector2.zero;
         ContactCollider = null;
+        debugContactDirection = "None";
 
         if (weaponController == null)
         {
@@ -108,10 +110,11 @@ public sealed class WeaponTerrainProbe2D : MonoBehaviour
         {
             case WeaponState.Spear:
                 currentLength = spearProbeLength;
-                PerformSpearProbe(originPos, aimDir);
+                PerformSpearDualProbe(originPos, aimDir);
                 if (enableDebugLogging)
                 {
                     DebugSpearExclusions(originPos, aimDir);
+                    DebugSpearExclusions(originPos, -aimDir);
                 }
                 break;
 
@@ -140,16 +143,32 @@ public sealed class WeaponTerrainProbe2D : MonoBehaviour
         UpdateDebugFields(state, originPos, aimDir, currentLength);
     }
 
-    private void PerformSpearProbe(Vector3 origin, Vector3 direction)
+    private void PerformSpearDualProbe(Vector3 origin, Vector3 direction)
     {
-        RaycastHit2D hit = Physics2D.CircleCast(origin, spearProbeRadius, direction, spearProbeLength, terrainLayers);
+        RaycastHit2D hitFwd = Physics2D.CircleCast(origin, spearProbeRadius, direction, spearProbeLength, terrainLayers);
+        RaycastHit2D hitBwd = Physics2D.CircleCast(origin, spearProbeRadius, -direction, spearProbeLength, terrainLayers);
 
-        if (hit.collider != null && !IsIgnoredCollider(hit.collider))
+        bool fwdValid = hitFwd.collider != null && !IsIgnoredCollider(hitFwd.collider);
+        bool bwdValid = hitBwd.collider != null && !IsIgnoredCollider(hitBwd.collider);
+
+        if (fwdValid && bwdValid)
         {
-            IsContact = true;
-            ContactPoint = hit.point;
-            ContactNormal = hit.normal;
-            ContactCollider = hit.collider;
+            if (hitFwd.distance <= hitBwd.distance)
+            {
+                ApplyContact(hitFwd, "Forward");
+            }
+            else
+            {
+                ApplyContact(hitBwd, "Backward");
+            }
+        }
+        else if (fwdValid)
+        {
+            ApplyContact(hitFwd, "Forward");
+        }
+        else if (bwdValid)
+        {
+            ApplyContact(hitBwd, "Backward");
         }
     }
 
@@ -162,7 +181,17 @@ public sealed class WeaponTerrainProbe2D : MonoBehaviour
             ContactPoint = col.ClosestPoint(origin);
             ContactNormal = ((Vector2)origin - ContactPoint).normalized;
             ContactCollider = col;
+            debugContactDirection = "Center";
         }
+    }
+
+    private void ApplyContact(RaycastHit2D hit, string dirString)
+    {
+        IsContact = true;
+        ContactPoint = hit.point;
+        ContactNormal = hit.normal;
+        ContactCollider = hit.collider;
+        debugContactDirection = dirString;
     }
 
     private void DebugSpearExclusions(Vector3 origin, Vector3 direction)
@@ -244,16 +273,7 @@ public sealed class WeaponTerrainProbe2D : MonoBehaviour
 
     private void OnDrawGizmos()
     {
-        // Calculate Gizmo color based on config and state
         bool isConfigValid = terrainLayers.value != 0 && (debugActiveState != WeaponState.Spear || debugDistance > 0f);
-        if (!isConfigValid)
-        {
-            Gizmos.color = Color.red;
-        }
-        else
-        {
-            Gizmos.color = debugIsContact ? Color.green : Color.yellow;
-        }
 
         if (debugActiveState == WeaponState.BareHand)
         {
@@ -272,32 +292,24 @@ public sealed class WeaponTerrainProbe2D : MonoBehaviour
         switch (debugActiveState)
         {
             case WeaponState.Spear:
-                // Draw path of the Spear capsule
-                Vector3 end = start + dir * dist;
-                Gizmos.DrawLine(start, end);
-                
-                // Draw side edges to resemble a true capsule along spear orientation
-                Vector3 sideOffset = new Vector3(-dir.y, dir.x, 0f) * spearProbeRadius;
-                Gizmos.DrawLine(start + sideOffset, end + sideOffset);
-                Gizmos.DrawLine(start - sideOffset, end - sideOffset);
+                Color fwdColor = isConfigValid ? (debugContactDirection == "Forward" ? Color.green : Color.yellow) : Color.red;
+                Color bwdColor = isConfigValid ? (debugContactDirection == "Backward" ? Color.green : Color.yellow) : Color.red;
 
-                Gizmos.DrawWireSphere(start, spearProbeRadius);
-                Gizmos.DrawWireSphere(end, spearProbeRadius);
-
-                // Start and End Cross markers
-                DrawCross(start, 0.08f);
-                DrawCross(end, 0.08f);
+                DrawSpearCapsuleGizmo(start, dir, dist, spearProbeRadius, fwdColor);
+                DrawSpearCapsuleGizmo(start, -dir, dist, spearProbeRadius, bwdColor);
                 break;
 
             case WeaponState.Boomerang:
                 if (enableBoomerangProbe)
                 {
+                    Gizmos.color = isConfigValid ? (debugIsContact ? Color.green : Color.yellow) : Color.red;
                     Gizmos.DrawWireSphere(start, boomerangProbeRadius);
                     DrawCross(start, 0.08f);
                 }
                 break;
 
             case WeaponState.Scissors:
+                Gizmos.color = isConfigValid ? (debugIsContact ? Color.green : Color.yellow) : Color.red;
                 Gizmos.DrawWireSphere(start, scissorsProbeRadius);
                 DrawCross(start, 0.08f);
                 break;
@@ -307,11 +319,27 @@ public sealed class WeaponTerrainProbe2D : MonoBehaviour
         if (debugIsContact)
         {
             Gizmos.color = Color.green;
-            // Draw a distinct solid sphere and outline circle at the hit location
             Gizmos.DrawSphere(debugContactPoint, 0.08f);
             Gizmos.DrawWireSphere(debugContactPoint, 0.15f);
             Gizmos.DrawRay(debugContactPoint, debugContactNormal * 0.5f);
         }
+    }
+
+    private void DrawSpearCapsuleGizmo(Vector3 start, Vector3 dir, float dist, float radius, Color color)
+    {
+        Gizmos.color = color;
+        Vector3 end = start + dir * dist;
+        Gizmos.DrawLine(start, end);
+        
+        Vector3 sideOffset = new Vector3(-dir.y, dir.x, 0f) * radius;
+        Gizmos.DrawLine(start + sideOffset, end + sideOffset);
+        Gizmos.DrawLine(start - sideOffset, end - sideOffset);
+
+        Gizmos.DrawWireSphere(start, radius);
+        Gizmos.DrawWireSphere(end, radius);
+
+        DrawCross(start, 0.08f);
+        DrawCross(end, 0.08f);
     }
 
     private void DrawCross(Vector3 position, float size)
