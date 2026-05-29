@@ -21,7 +21,7 @@ MonoBehaviour:
   activeSeconds: 0.18
   recoverySeconds: 0.24
   reaction:
-    reactionType: 2
+    reactionType: 0
     damage: 16
     knockbackForce: 3
     stunSeconds: 0.45

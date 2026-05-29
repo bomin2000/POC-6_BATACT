@@ -58,28 +58,6 @@ public sealed class DualBladeWeaponController : MonoBehaviour
     [SerializeField] private float scissorsCutOpenSeconds = 0.13f;
     [SerializeField] private float scissorsCutLungeDistance = 0.25f;
 
-    [Header("Terrain Contact")]
-    [SerializeField] private bool clampMeleeLungeAgainstTerrain = true;
-    [SerializeField] private bool clampBladeReachAgainstTerrain = true;
-    [SerializeField] private LayerMask weaponBlockLayers = ~0;
-    [SerializeField] private float weaponBlockProbeRadius = 0.08f;
-    [SerializeField] private float weaponBlockSkin = 0.04f;
-    [SerializeField] private float bladeCastBaseLength = 1.15f;
-    [SerializeField] private float blockedAttackHoldSeconds = 0.045f;
-    [SerializeField] private bool blockOnlyStaticOrKinematicBodies = true;
-
-    [Header("Spear Vault Prototype")]
-    [SerializeField] private bool enableSpearVault = true;
-    [SerializeField] private bool enableSpearAnchorConstraint = true;
-    [SerializeField] private KeyCode spearVaultKey = KeyCode.Space;
-    [SerializeField] private float spearAnchorKeepAliveSeconds = 0.08f;
-    [SerializeField] private float spearAnchorSlack = 0.03f;
-    [SerializeField] private float spearVaultUpImpulse = 13f;
-    [SerializeField] private float spearVaultBackImpulse = 4f;
-    [SerializeField] private float spearVaultControlLockSeconds = 0.08f;
-    [SerializeField] private float spearVaultCooldown = 0.35f;
-    [SerializeField] private float spearVaultMinimumGroundNormalY = 0.45f;
-
     [Header("Combo Buffer")]
     [SerializeField] private bool enableComboBuffer = true;
     [SerializeField] private float comboResetSeconds = 0.7f;
@@ -114,14 +92,6 @@ public sealed class DualBladeWeaponController : MonoBehaviour
     private float attackUpperAngleOffset;
     private float attackLowerAngleOffset;
     private float attackLengthScaleOffset;
-    private float blockedAttackHoldTimer;
-    private Vector3 blockedAttackOffset;
-    private bool bladeTerrainContact;
-    private Vector2 bladeTerrainContactPoint;
-    private Vector2 bladeTerrainContactNormal = Vector2.up;
-    private float bladeTerrainContactDistance;
-    private float bladeTerrainAnchorDistance;
-    private float lastSpearVaultTime = -999f;
     private WeaponState comboState = WeaponState.Boomerang;
     private int comboIndex;
     private float lastComboTime = -999f;
@@ -167,8 +137,6 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         ReadFormInput();
         ReadAttackInput();
         SmoothSnapVisibleForm();
-        UpdateSpearAnchorConstraint();
-        TryApplySpearVault();
     }
 
     private void UpdateAimDirection()
@@ -434,163 +402,6 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         }
 
         return weaponRoot.TransformVector(attackPivotOffset);
-    }
-
-    private void SetAttackPivotOffset(Vector3 desiredLocalOffset)
-    {
-        Vector3 limitedOffset = LimitAttackOffsetAgainstTerrain(desiredLocalOffset);
-        bool wasBlocked = (limitedOffset - desiredLocalOffset).sqrMagnitude > 0.0001f;
-
-        if (wasBlocked)
-        {
-            blockedAttackHoldTimer = blockedAttackHoldSeconds;
-            blockedAttackOffset = limitedOffset;
-        }
-        else if (blockedAttackHoldTimer > 0f && desiredLocalOffset.sqrMagnitude > blockedAttackOffset.sqrMagnitude)
-        {
-            blockedAttackHoldTimer -= Time.unscaledDeltaTime;
-            limitedOffset = blockedAttackOffset;
-        }
-
-        attackPivotOffset = limitedOffset;
-    }
-
-    private Vector3 LimitAttackOffsetAgainstTerrain(Vector3 desiredLocalOffset)
-    {
-        if (!clampMeleeLungeAgainstTerrain || weaponRoot == null || desiredLocalOffset.sqrMagnitude < 0.0001f)
-        {
-            return desiredLocalOffset;
-        }
-
-        Vector2 origin = GetWeaponBlockOrigin();
-        Vector2 desiredWorldOffset = weaponRoot.TransformVector(desiredLocalOffset);
-        float distance = desiredWorldOffset.magnitude;
-        if (distance <= 0.0001f)
-        {
-            return desiredLocalOffset;
-        }
-
-        Vector2 direction = desiredWorldOffset / distance;
-        RaycastHit2D[] hits = Physics2D.CircleCastAll(
-            origin,
-            Mathf.Max(0.01f, weaponBlockProbeRadius),
-            direction,
-            distance,
-            weaponBlockLayers);
-
-        float closestDistance = float.PositiveInfinity;
-        for (int i = 0; i < hits.Length; i++)
-        {
-            Collider2D hitCollider = hits[i].collider;
-            if (!IsValidWeaponBlocker(hitCollider))
-            {
-                continue;
-            }
-
-            if (hits[i].distance < closestDistance)
-            {
-                closestDistance = hits[i].distance;
-            }
-        }
-
-        if (float.IsPositiveInfinity(closestDistance))
-        {
-            return desiredLocalOffset;
-        }
-
-        float allowedDistance = Mathf.Max(0f, closestDistance - weaponBlockSkin);
-        Vector2 allowedWorldOffset = direction * allowedDistance;
-        return weaponRoot.InverseTransformVector(allowedWorldOffset);
-    }
-
-    private Vector2 GetWeaponBlockOrigin()
-    {
-        if (weaponRoot != null)
-        {
-            return weaponRoot.TransformPoint(GetPivotPosition(visibleForm));
-        }
-
-        return transform.position;
-    }
-
-    private bool IsValidWeaponBlocker(Collider2D hitCollider)
-    {
-        if (hitCollider == null || hitCollider.isTrigger || ContainsWeaponCollider(hitCollider))
-        {
-            return false;
-        }
-
-        if (hitCollider.GetComponentInParent<PlayerHealth>() != null)
-        {
-            return false;
-        }
-
-        if (hitCollider.GetComponentInParent<IWeaponHitReceiver>() != null)
-        {
-            return false;
-        }
-
-        if (!blockOnlyStaticOrKinematicBodies)
-        {
-            return true;
-        }
-
-        Rigidbody2D attachedBody = hitCollider.attachedRigidbody;
-        return attachedBody == null || attachedBody.bodyType != RigidbodyType2D.Dynamic;
-    }
-
-    private void TryApplySpearVault()
-    {
-        if (!enableSpearVault || CurrentState != WeaponState.Spear || !bladeTerrainContact)
-        {
-            return;
-        }
-
-        if (!Input.GetKeyDown(spearVaultKey) || Time.time - lastSpearVaultTime < spearVaultCooldown)
-        {
-            return;
-        }
-
-        if (bladeTerrainContactNormal.y < spearVaultMinimumGroundNormalY)
-        {
-            return;
-        }
-
-        if (playerMovement == null)
-        {
-            playerMovement = GetComponent<PlayerTopDownMovement>();
-        }
-
-        if (playerMovement == null)
-        {
-            return;
-        }
-
-        int backSign = transform.position.x >= bladeTerrainContactPoint.x ? 1 : -1;
-        Vector2 impulse = new Vector2(backSign * spearVaultBackImpulse, spearVaultUpImpulse);
-        playerMovement.ApplyWeaponVault(impulse, spearVaultControlLockSeconds);
-        lastSpearVaultTime = Time.time;
-    }
-
-    private void UpdateSpearAnchorConstraint()
-    {
-        if (!enableSpearAnchorConstraint || CurrentState != WeaponState.Spear || !bladeTerrainContact)
-        {
-            return;
-        }
-
-        if (playerMovement == null)
-        {
-            playerMovement = GetComponent<PlayerTopDownMovement>();
-        }
-
-        if (playerMovement == null)
-        {
-            return;
-        }
-
-        float anchorDistance = bladeTerrainAnchorDistance + spearAnchorSlack;
-        playerMovement.SetWeaponAnchorConstraint(bladeTerrainContactPoint, anchorDistance, spearAnchorKeepAliveSeconds);
     }
 
     private void PlayMeleeVisualAnimation(WeaponState attackState, int attackComboIndex)
@@ -937,8 +748,11 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         attackUpperAngleOffset = 0f;
         attackLowerAngleOffset = 0f;
         attackLengthScaleOffset = 0f;
-        blockedAttackHoldTimer = 0f;
-        blockedAttackOffset = Vector3.zero;
+    }
+
+    private void SetAttackPivotOffset(Vector3 desiredLocalOffset)
+    {
+        attackPivotOffset = desiredLocalOffset;
     }
 
     private static float EaseOutCubic(float t)
@@ -963,14 +777,10 @@ public sealed class DualBladeWeaponController : MonoBehaviour
     private void ApplyBladePose(BladePose pose, float t)
     {
         float bladeDistance = Mathf.Max(0f, pose.bladeDistanceFromPivot);
-        bladeTerrainContact = false;
-        bladeTerrainContactDistance = float.PositiveInfinity;
-        bladeTerrainAnchorDistance = 0f;
 
         if (upperBlade != null)
         {
             Vector3 upperDirection = GetLocalDirection(pose.upperBladeAngle);
-            DetectBladeTerrainContact(upperDirection, bladeDistance, pose.lengthScale);
             upperBlade.localPosition = Vector3.Lerp(upperBlade.localPosition, upperDirection * bladeDistance, t);
             upperBlade.localRotation = Quaternion.Lerp(
                 upperBlade.localRotation,
@@ -982,7 +792,6 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         if (lowerBlade != null)
         {
             Vector3 lowerDirection = GetLocalDirection(pose.lowerBladeAngle);
-            DetectBladeTerrainContact(lowerDirection, bladeDistance, pose.lengthScale);
             lowerBlade.localPosition = Vector3.Lerp(lowerBlade.localPosition, lowerDirection * bladeDistance, t);
             lowerBlade.localRotation = Quaternion.Lerp(
                 lowerBlade.localRotation,
@@ -990,62 +799,6 @@ public sealed class DualBladeWeaponController : MonoBehaviour
                 t);
             lowerBlade.localScale = Vector3.Lerp(lowerBlade.localScale, new Vector3(pose.lengthScale, 1f, 1f), t);
         }
-    }
-
-    private void DetectBladeTerrainContact(Vector3 localDirection, float desiredDistance, float desiredScale)
-    {
-        if (!clampBladeReachAgainstTerrain || weaponRoot == null)
-        {
-            return;
-        }
-
-        Vector2 origin = weaponRoot.TransformPoint(GetPivotPosition(visibleForm) + attackPivotOffset);
-        Vector2 worldDirection = weaponRoot.TransformDirection(localDirection).normalized;
-        float desiredReach = desiredDistance + bladeCastBaseLength * Mathf.Max(0f, desiredScale);
-        if (desiredReach <= 0.0001f || worldDirection.sqrMagnitude <= 0.0001f)
-        {
-            return;
-        }
-
-        RaycastHit2D[] hits = Physics2D.CircleCastAll(
-            origin,
-            Mathf.Max(0.01f, weaponBlockProbeRadius),
-            worldDirection,
-            desiredReach,
-            weaponBlockLayers);
-
-        float closestDistance = float.PositiveInfinity;
-        RaycastHit2D closestHit = default;
-        for (int i = 0; i < hits.Length; i++)
-        {
-            Collider2D hitCollider = hits[i].collider;
-            if (!IsValidWeaponBlocker(hitCollider))
-            {
-                continue;
-            }
-
-            if (hits[i].distance < closestDistance)
-            {
-                closestDistance = hits[i].distance;
-                closestHit = hits[i];
-            }
-        }
-
-        if (float.IsPositiveInfinity(closestDistance))
-        {
-            return;
-        }
-
-        if (closestDistance >= bladeTerrainContactDistance)
-        {
-            return;
-        }
-
-        bladeTerrainContact = true;
-        bladeTerrainContactDistance = closestDistance;
-        bladeTerrainContactPoint = closestHit.point;
-        bladeTerrainContactNormal = closestHit.normal.sqrMagnitude > 0.0001f ? closestHit.normal : -worldDirection;
-        bladeTerrainAnchorDistance = Vector2.Distance(transform.position, origin + worldDirection * desiredReach);
     }
 
     private static Vector3 GetLocalDirection(float angleDegrees)

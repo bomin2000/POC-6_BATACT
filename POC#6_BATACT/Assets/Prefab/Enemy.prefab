@@ -105,6 +105,7 @@ GameObject:
   - component: {fileID: 6034897910565810859}
   - component: {fileID: 2033463836135743422}
   - component: {fileID: 3049690700899848916}
+  - component: {fileID: 2394862614227179770}
   m_Layer: 3
   m_Name: Enemy
   m_TagString: Untagged
@@ -170,6 +171,8 @@ MonoBehaviour:
   maxHealth: 100
   destroyOnDeath: 1
   deathDestroyDelay: 0.05
+  dieBelowY: 1
+  deathY: -12
   hitStopSeconds: 0.035
   hitStopCooldown: 0.08
   flashRenderer: {fileID: 0}
@@ -275,3 +278,19 @@ MonoBehaviour:
   hideOnDeath: 1
   backgroundColor: {r: 0.08, g: 0.08, b: 0.08, a: 0.8}
   fillColor: {r: 0.95, g: 0.15, b: 0.1, a: 1}
+--- !u!114 &2394862614227179770
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5576281405834939419}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 96a688d8ae4eaa545a164a36e4c8e223, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyContactDamage
+  damage: 10
+  knockbackForce: 8
+  extraImpulse: {x: 0, y: 2}
+  damageCooldown: 0.6
