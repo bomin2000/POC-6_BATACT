@@ -72,6 +72,7 @@ public sealed class DualBladeWeaponController : MonoBehaviour
     public WeaponState CurrentState { get; private set; } = WeaponState.Boomerang;
     public WeaponState? QueuedState { get; private set; }
     public bool IsInputLocked => CurrentState == WeaponState.BareHand;
+    public Transform WeaponRoot => weaponRoot;
 
     public bool ContainsWeaponCollider(Collider2D candidate)
     {

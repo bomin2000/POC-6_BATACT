@@ -1099,6 +1099,7 @@ MonoBehaviour:
   dashSpeed: 15
   dashDuration: 0.2
   dashCooldown: 1
+  dashBufferTime: 0.1
   allowAirDash: 1
   dashUsesMoveInputFirst: 1
   groundCheck: {fileID: 0}
@@ -1107,6 +1108,9 @@ MonoBehaviour:
   groundLayers:
     serializedVersion: 2
     m_Bits: 4294967295
+  useColliderGroundFallback: 1
+  groundProbeDistance: 0.08
+  minimumGroundNormalY: 0.45
   visualRoot: {fileID: 0}
   flipVisualByFacing: 1
 --- !u!114 &465521171
