@@ -58,6 +58,14 @@ public sealed class DualBladeWeaponController : MonoBehaviour
     [SerializeField] private float scissorsCutOpenSeconds = 0.13f;
     [SerializeField] private float scissorsCutLungeDistance = 0.25f;
 
+    [Header("Terrain Contact")]
+    [SerializeField] private bool clampMeleeLungeAgainstTerrain = true;
+    [SerializeField] private LayerMask weaponBlockLayers = ~0;
+    [SerializeField] private float weaponBlockProbeRadius = 0.08f;
+    [SerializeField] private float weaponBlockSkin = 0.04f;
+    [SerializeField] private float blockedAttackHoldSeconds = 0.045f;
+    [SerializeField] private bool blockOnlyStaticOrKinematicBodies = true;
+
     [Header("Combo Buffer")]
     [SerializeField] private bool enableComboBuffer = true;
     [SerializeField] private float comboResetSeconds = 0.7f;
@@ -92,6 +100,8 @@ public sealed class DualBladeWeaponController : MonoBehaviour
     private float attackUpperAngleOffset;
     private float attackLowerAngleOffset;
     private float attackLengthScaleOffset;
+    private float blockedAttackHoldTimer;
+    private Vector3 blockedAttackOffset;
     private WeaponState comboState = WeaponState.Boomerang;
     private int comboIndex;
     private float lastComboTime = -999f;
@@ -404,6 +414,109 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         return weaponRoot.TransformVector(attackPivotOffset);
     }
 
+    private void SetAttackPivotOffset(Vector3 desiredLocalOffset)
+    {
+        Vector3 limitedOffset = LimitAttackOffsetAgainstTerrain(desiredLocalOffset);
+        bool wasBlocked = (limitedOffset - desiredLocalOffset).sqrMagnitude > 0.0001f;
+
+        if (wasBlocked)
+        {
+            blockedAttackHoldTimer = blockedAttackHoldSeconds;
+            blockedAttackOffset = limitedOffset;
+        }
+        else if (blockedAttackHoldTimer > 0f && desiredLocalOffset.sqrMagnitude > blockedAttackOffset.sqrMagnitude)
+        {
+            blockedAttackHoldTimer -= Time.unscaledDeltaTime;
+            limitedOffset = blockedAttackOffset;
+        }
+
+        attackPivotOffset = limitedOffset;
+    }
+
+    private Vector3 LimitAttackOffsetAgainstTerrain(Vector3 desiredLocalOffset)
+    {
+        if (!clampMeleeLungeAgainstTerrain || weaponRoot == null || desiredLocalOffset.sqrMagnitude < 0.0001f)
+        {
+            return desiredLocalOffset;
+        }
+
+        Vector2 origin = GetWeaponBlockOrigin();
+        Vector2 desiredWorldOffset = weaponRoot.TransformVector(desiredLocalOffset);
+        float distance = desiredWorldOffset.magnitude;
+        if (distance <= 0.0001f)
+        {
+            return desiredLocalOffset;
+        }
+
+        Vector2 direction = desiredWorldOffset / distance;
+        RaycastHit2D[] hits = Physics2D.CircleCastAll(
+            origin,
+            Mathf.Max(0.01f, weaponBlockProbeRadius),
+            direction,
+            distance,
+            weaponBlockLayers);
+
+        float closestDistance = float.PositiveInfinity;
+        for (int i = 0; i < hits.Length; i++)
+        {
+            Collider2D hitCollider = hits[i].collider;
+            if (!IsValidWeaponBlocker(hitCollider))
+            {
+                continue;
+            }
+
+            if (hits[i].distance < closestDistance)
+            {
+                closestDistance = hits[i].distance;
+            }
+        }
+
+        if (float.IsPositiveInfinity(closestDistance))
+        {
+            return desiredLocalOffset;
+        }
+
+        float allowedDistance = Mathf.Max(0f, closestDistance - weaponBlockSkin);
+        Vector2 allowedWorldOffset = direction * allowedDistance;
+        return weaponRoot.InverseTransformVector(allowedWorldOffset);
+    }
+
+    private Vector2 GetWeaponBlockOrigin()
+    {
+        if (weaponRoot != null)
+        {
+            return weaponRoot.TransformPoint(GetPivotPosition(visibleForm));
+        }
+
+        return transform.position;
+    }
+
+    private bool IsValidWeaponBlocker(Collider2D hitCollider)
+    {
+        if (hitCollider == null || hitCollider.isTrigger || ContainsWeaponCollider(hitCollider))
+        {
+            return false;
+        }
+
+        if (hitCollider.GetComponentInParent<PlayerHealth>() != null)
+        {
+            return false;
+        }
+
+        if (hitCollider.GetComponentInParent<IWeaponHitReceiver>() != null)
+        {
+            return false;
+        }
+
+        if (!blockOnlyStaticOrKinematicBodies)
+        {
+            return true;
+        }
+
+        Rigidbody2D attachedBody = hitCollider.attachedRigidbody;
+        return attachedBody == null || attachedBody.bodyType != RigidbodyType2D.Dynamic;
+    }
+
     private void PlayMeleeVisualAnimation(WeaponState attackState, int attackComboIndex)
     {
         if (meleeAnimationRoutine != null)
@@ -683,7 +796,7 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         {
             elapsed += Time.unscaledDeltaTime;
             float t = EaseOutCubic(Mathf.Clamp01(elapsed / spearThrustOutSeconds));
-            attackPivotOffset = Vector3.right * (thrustDistance * t);
+            SetAttackPivotOffset(Vector3.right * (thrustDistance * t));
             attackLengthScaleOffset = thrustStretch * t;
             yield return null;
         }
@@ -693,7 +806,7 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         {
             elapsed += Time.unscaledDeltaTime;
             float t = EaseInOutCubic(Mathf.Clamp01(elapsed / spearThrustBackSeconds));
-            attackPivotOffset = Vector3.right * Mathf.Lerp(thrustDistance, 0f, t);
+            SetAttackPivotOffset(Vector3.right * Mathf.Lerp(thrustDistance, 0f, t));
             attackLengthScaleOffset = Mathf.Lerp(thrustStretch, 0f, t);
             yield return null;
         }
@@ -714,7 +827,7 @@ public sealed class DualBladeWeaponController : MonoBehaviour
             float t = EaseOutCubic(Mathf.Clamp01(elapsed / scissorsCutCloseSeconds));
             attackUpperAngleOffset = closeUpperOffset * t;
             attackLowerAngleOffset = closeLowerOffset * t;
-            attackPivotOffset = Vector3.right * (lungeDistance * t);
+            SetAttackPivotOffset(Vector3.right * (lungeDistance * t));
             yield return null;
         }
 
@@ -726,7 +839,7 @@ public sealed class DualBladeWeaponController : MonoBehaviour
             float remaining = 1f - t;
             attackUpperAngleOffset = closeUpperOffset * remaining;
             attackLowerAngleOffset = closeLowerOffset * remaining;
-            attackPivotOffset = Vector3.right * (lungeDistance * remaining);
+            SetAttackPivotOffset(Vector3.right * (lungeDistance * remaining));
             yield return null;
         }
     }
@@ -748,6 +861,8 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         attackUpperAngleOffset = 0f;
         attackLowerAngleOffset = 0f;
         attackLengthScaleOffset = 0f;
+        blockedAttackHoldTimer = 0f;
+        blockedAttackOffset = Vector3.zero;
     }
 
     private static float EaseOutCubic(float t)
