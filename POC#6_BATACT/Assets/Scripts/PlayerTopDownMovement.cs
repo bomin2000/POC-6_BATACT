@@ -40,6 +40,10 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
     [SerializeField] private Transform visualRoot;
     [SerializeField] private bool flipVisualByFacing = true;
 
+    [Header("Weapon Anchor Constraint")]
+    [SerializeField] private float weaponAnchorSkin = 0.02f;
+    [SerializeField] private float weaponAnchorVelocityDamping = 0.25f;
+
     public bool IsGrounded { get; private set; }
     public bool IsDashing => dashTimer > 0f;
     public int FacingSign { get; private set; } = 1;
@@ -62,6 +66,10 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
     private float defaultGravityScale;
     private bool hasAimFacingOverride;
     private int aimFacingSign = 1;
+    private bool hasWeaponAnchor;
+    private Vector2 weaponAnchorPoint;
+    private float weaponAnchorDistance;
+    private float weaponAnchorTimer;
 
     private void Awake()
     {
@@ -132,18 +140,21 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
         if (externalControlLockTimer > 0f)
         {
             ApplyBetterJumpGravity();
+            ApplyWeaponAnchorConstraint();
             return;
         }
 
         if (IsDashing)
         {
             TickDash();
+            ApplyWeaponAnchorConstraint();
             return;
         }
 
         ApplyHorizontalMovement();
         TryConsumeJump();
         ApplyBetterJumpGravity();
+        ApplyWeaponAnchorConstraint();
     }
 
     private void UpdateGrounded()
@@ -359,6 +370,58 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
         Vector2 currentVelocity = body.linearVelocity;
         body.linearVelocity = new Vector2(currentVelocity.x * 0.35f, Mathf.Max(0f, currentVelocity.y));
         body.AddForce(impulse, ForceMode2D.Impulse);
+    }
+
+    public void SetWeaponAnchorConstraint(Vector2 anchorPoint, float anchorDistance, float keepAliveSeconds)
+    {
+        if (anchorDistance <= 0f || keepAliveSeconds <= 0f)
+        {
+            return;
+        }
+
+        bool sameAnchor = hasWeaponAnchor && Vector2.Distance(weaponAnchorPoint, anchorPoint) <= 0.25f;
+        weaponAnchorPoint = anchorPoint;
+        weaponAnchorDistance = sameAnchor ? weaponAnchorDistance : anchorDistance;
+        weaponAnchorTimer = keepAliveSeconds;
+        hasWeaponAnchor = true;
+    }
+
+    public void ClearWeaponAnchorConstraint()
+    {
+        hasWeaponAnchor = false;
+        weaponAnchorTimer = 0f;
+    }
+
+    private void ApplyWeaponAnchorConstraint()
+    {
+        if (!hasWeaponAnchor)
+        {
+            return;
+        }
+
+        weaponAnchorTimer -= Time.fixedDeltaTime;
+        if (weaponAnchorTimer <= 0f)
+        {
+            ClearWeaponAnchorConstraint();
+            return;
+        }
+
+        Vector2 currentPosition = body.position;
+        Vector2 fromAnchor = currentPosition - weaponAnchorPoint;
+        float distance = fromAnchor.magnitude;
+        float targetDistance = Mathf.Max(0.01f, weaponAnchorDistance);
+        if (Mathf.Abs(distance - targetDistance) <= weaponAnchorSkin || distance <= 0.0001f)
+        {
+            return;
+        }
+
+        Vector2 radialDirection = fromAnchor / distance;
+        Vector2 constrainedPosition = weaponAnchorPoint + radialDirection * targetDistance;
+        body.position = constrainedPosition;
+
+        Vector2 velocity = body.linearVelocity;
+        velocity -= radialDirection * Vector2.Dot(velocity, radialDirection);
+        body.linearVelocity = velocity * weaponAnchorVelocityDamping;
     }
 
     public void SetAimFacingSign(int sign)

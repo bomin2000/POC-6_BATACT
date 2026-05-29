@@ -70,7 +70,10 @@ public sealed class DualBladeWeaponController : MonoBehaviour
 
     [Header("Spear Vault Prototype")]
     [SerializeField] private bool enableSpearVault = true;
+    [SerializeField] private bool enableSpearAnchorConstraint = true;
     [SerializeField] private KeyCode spearVaultKey = KeyCode.Space;
+    [SerializeField] private float spearAnchorKeepAliveSeconds = 0.08f;
+    [SerializeField] private float spearAnchorSlack = 0.03f;
     [SerializeField] private float spearVaultUpImpulse = 13f;
     [SerializeField] private float spearVaultBackImpulse = 4f;
     [SerializeField] private float spearVaultControlLockSeconds = 0.08f;
@@ -162,6 +165,7 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         ReadFormInput();
         ReadAttackInput();
         SmoothSnapVisibleForm();
+        UpdateSpearAnchorConstraint();
         TryApplySpearVault();
     }
 
@@ -564,6 +568,27 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         Vector2 impulse = new Vector2(backSign * spearVaultBackImpulse, spearVaultUpImpulse);
         playerMovement.ApplyWeaponVault(impulse, spearVaultControlLockSeconds);
         lastSpearVaultTime = Time.time;
+    }
+
+    private void UpdateSpearAnchorConstraint()
+    {
+        if (!enableSpearAnchorConstraint || CurrentState != WeaponState.Spear || !bladeTerrainContact)
+        {
+            return;
+        }
+
+        if (playerMovement == null)
+        {
+            playerMovement = GetComponent<PlayerTopDownMovement>();
+        }
+
+        if (playerMovement == null)
+        {
+            return;
+        }
+
+        float maxDistance = Vector2.Distance(bladeTerrainContactPoint, transform.position) + spearAnchorSlack;
+        playerMovement.SetWeaponAnchorConstraint(bladeTerrainContactPoint, maxDistance, spearAnchorKeepAliveSeconds);
     }
 
     private void PlayMeleeVisualAnimation(WeaponState attackState, int attackComboIndex)
