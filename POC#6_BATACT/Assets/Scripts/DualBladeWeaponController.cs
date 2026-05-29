@@ -46,6 +46,7 @@ public sealed class DualBladeWeaponController : MonoBehaviour
     [Header("Side View Aiming")]
     [SerializeField] private bool sideViewMirrorAim = true;
     [SerializeField] private bool drivePlayerFacingFromAim = true;
+    [SerializeField] private float sideViewAimMaxAngle = 80f;
 
     [Header("Melee Attack Animation")]
     [SerializeField] private float spearThrustDistance = 1.05f;
@@ -145,8 +146,8 @@ public sealed class DualBladeWeaponController : MonoBehaviour
             if (sideViewMirrorAim)
             {
                 int aimSign = toMouse.x >= 0f ? 1 : -1;
-                aimDirection = aimSign > 0 ? Vector2.right : Vector2.left;
-                ApplySideViewWeaponFacing(aimSign);
+                aimDirection = ClampAimToFacingHemisphere(toMouse.normalized, aimSign);
+                ApplySideViewWeaponFacing(aimSign, aimDirection);
             }
             else
             {
@@ -156,11 +157,25 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         }
     }
 
-    private void ApplySideViewWeaponFacing(int aimSign)
+    private Vector2 ClampAimToFacingHemisphere(Vector2 rawAim, int aimSign)
+    {
+        float localX = Mathf.Abs(rawAim.x);
+        float localY = rawAim.y;
+        float localAngle = Mathf.Atan2(localY, Mathf.Max(0.001f, localX)) * Mathf.Rad2Deg;
+        localAngle = Mathf.Clamp(localAngle, -sideViewAimMaxAngle, sideViewAimMaxAngle);
+
+        float radians = localAngle * Mathf.Deg2Rad;
+        return new Vector2(Mathf.Cos(radians) * aimSign, Mathf.Sin(radians)).normalized;
+    }
+
+    private void ApplySideViewWeaponFacing(int aimSign, Vector2 worldAim)
     {
         if (weaponRoot != null)
         {
-            weaponRoot.localRotation = Quaternion.identity;
+            float localAngle = Mathf.Atan2(worldAim.y, Mathf.Abs(worldAim.x)) * Mathf.Rad2Deg;
+            float visualAngle = aimSign > 0 ? localAngle : -localAngle;
+            weaponRoot.localRotation = Quaternion.Euler(0f, 0f, visualAngle);
+
             Vector3 scale = weaponRoot.localScale;
             scale.x = Mathf.Abs(scale.x) * aimSign;
             scale.y = Mathf.Abs(scale.y);

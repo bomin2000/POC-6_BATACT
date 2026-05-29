@@ -49,6 +49,7 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
     private float dashTimer;
     private float dashCooldownTimer;
     private float catchStabilizeTimer;
+    private float externalControlLockTimer;
     private bool hasAirDash;
     private float defaultGravityScale;
     private bool hasAimFacingOverride;
@@ -76,6 +77,11 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
         if (catchStabilizeTimer > 0f)
         {
             catchStabilizeTimer -= Time.deltaTime;
+        }
+
+        if (externalControlLockTimer > 0f)
+        {
+            externalControlLockTimer -= Time.deltaTime;
         }
 
         if (hasAimFacingOverride)
@@ -106,6 +112,12 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
     private void FixedUpdate()
     {
         UpdateGrounded();
+
+        if (externalControlLockTimer > 0f)
+        {
+            ApplyBetterJumpGravity();
+            return;
+        }
 
         if (IsDashing)
         {
@@ -210,7 +222,7 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
 
     private void TryStartDash()
     {
-        if (dashCooldownTimer > 0f || IsDashing || catchStabilizeTimer > 0f)
+        if (dashCooldownTimer > 0f || IsDashing || catchStabilizeTimer > 0f || externalControlLockTimer > 0f)
         {
             return;
         }
@@ -277,6 +289,15 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
         dashCooldownTimer = Mathf.Max(dashCooldownTimer, 0.08f);
         body.gravityScale = defaultGravityScale;
         body.linearVelocity = new Vector2(0f, Mathf.Min(body.linearVelocity.y, jumpVelocity * 0.35f));
+    }
+
+    public void ApplyExternalKnockback(Vector2 impulse, float controlLockSeconds)
+    {
+        externalControlLockTimer = Mathf.Max(externalControlLockTimer, controlLockSeconds);
+        dashTimer = 0f;
+        body.gravityScale = defaultGravityScale;
+        body.linearVelocity = Vector2.zero;
+        body.AddForce(impulse, ForceMode2D.Impulse);
     }
 
     public void SetAimFacingSign(int sign)
