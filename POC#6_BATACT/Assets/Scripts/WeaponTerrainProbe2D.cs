@@ -21,12 +21,28 @@ public sealed class WeaponTerrainProbe2D : MonoBehaviour
     [Header("Scissors Settings")]
     [SerializeField] private float scissorsProbeRadius = 0.75f;
 
+    [Header("Debugging Options")]
+    [SerializeField] private bool enableDebugLogging = false;
+
+    [Header("Debug Status (Read-Only)")]
+    [SerializeField] private WeaponState debugActiveState;
+    [SerializeField] private Vector3 debugStartPoint;
+    [SerializeField] private Vector3 debugDirection;
+    [SerializeField] private float debugDistance;
+    [SerializeField] private bool debugIsContact;
+    [SerializeField] private Vector2 debugContactPoint;
+    [SerializeField] private Vector2 debugContactNormal;
+    [SerializeField] private string debugContactColliderName;
+    [SerializeField] private string debugContactColliderLayerName;
+
     // Public properties exposing collision status to other scripts/events
     public bool IsContact { get; private set; }
     public Vector2 ContactPoint { get; private set; }
     public Vector2 ContactNormal { get; private set; }
     public Collider2D ContactCollider { get; private set; }
     public WeaponState ActiveState => weaponController != null ? weaponController.CurrentState : WeaponState.BareHand;
+
+    private bool hasWarnedLayers = false;
 
     private void Awake()
     {
@@ -57,7 +73,14 @@ public sealed class WeaponTerrainProbe2D : MonoBehaviour
 
     private void EvaluateTerrainContact()
     {
-        // Reset state
+        // Warn once if terrainLayers is empty (value == 0)
+        if (terrainLayers.value == 0 && !hasWarnedLayers)
+        {
+            hasWarnedLayers = true;
+            Debug.LogWarning("[WeaponTerrainProbe2D] Warning: terrainLayers is set to 'Nothing' or empty. Probe will not detect any collisions.", this);
+        }
+
+        // Reset runtime public state
         IsContact = false;
         ContactPoint = Vector2.zero;
         ContactNormal = Vector2.zero;
@@ -65,40 +88,60 @@ public sealed class WeaponTerrainProbe2D : MonoBehaviour
 
         if (weaponController == null)
         {
+            UpdateDebugFields(WeaponState.BareHand, Vector3.zero, Vector3.zero, 0f);
             return;
         }
 
         WeaponState state = weaponController.CurrentState;
+        debugActiveState = state;
         if (state == WeaponState.BareHand)
         {
+            UpdateDebugFields(state, Vector3.zero, Vector3.zero, 0f);
             return;
         }
 
         Vector3 originPos = probeOrigin != null ? probeOrigin.position : transform.position;
         Vector3 aimDir = probeOrigin != null ? probeOrigin.right : transform.right;
+        float currentLength = 0f;
 
         switch (state)
         {
             case WeaponState.Spear:
+                currentLength = spearProbeLength;
                 PerformSpearProbe(originPos, aimDir);
+                if (enableDebugLogging)
+                {
+                    DebugSpearExclusions(originPos, aimDir);
+                }
                 break;
 
             case WeaponState.Boomerang:
                 if (enableBoomerangProbe)
                 {
+                    currentLength = boomerangProbeRadius;
                     PerformCircularOverlapProbe(originPos, boomerangProbeRadius);
+                    if (enableDebugLogging)
+                    {
+                        DebugOverlapExclusions(originPos, boomerangProbeRadius);
+                    }
                 }
                 break;
 
             case WeaponState.Scissors:
+                currentLength = scissorsProbeRadius;
                 PerformCircularOverlapProbe(originPos, scissorsProbeRadius);
+                if (enableDebugLogging)
+                {
+                    DebugOverlapExclusions(originPos, scissorsProbeRadius);
+                }
                 break;
         }
+
+        UpdateDebugFields(state, originPos, aimDir, currentLength);
     }
 
     private void PerformSpearProbe(Vector3 origin, Vector3 direction)
     {
-        // We use CircleCast to simulate a capsule probe along the spear direction.
         RaycastHit2D hit = Physics2D.CircleCast(origin, spearProbeRadius, direction, spearProbeLength, terrainLayers);
 
         if (hit.collider != null && !IsIgnoredCollider(hit.collider))
@@ -116,10 +159,51 @@ public sealed class WeaponTerrainProbe2D : MonoBehaviour
         if (col != null && !IsIgnoredCollider(col))
         {
             IsContact = true;
-            // For overlap, approximate contact point at the closest point of the collider, or the collider's center.
             ContactPoint = col.ClosestPoint(origin);
             ContactNormal = ((Vector2)origin - ContactPoint).normalized;
             ContactCollider = col;
+        }
+    }
+
+    private void DebugSpearExclusions(Vector3 origin, Vector3 direction)
+    {
+        // Query ALL layers to log exclusions
+        RaycastHit2D[] hits = Physics2D.CircleCastAll(origin, spearProbeRadius, direction, spearProbeLength, ~0);
+        foreach (var hit in hits)
+        {
+            if (hit.collider == null) continue;
+
+            // Check LayerMask exclusion
+            if ((terrainLayers.value & (1 << hit.collider.gameObject.layer)) == 0)
+            {
+                Debug.Log($"[Probe Debug] Spear sweep touched '{hit.collider.name}' but it was EXCLUDED because its layer '{LayerMask.LayerToName(hit.collider.gameObject.layer)}' is not in terrainLayers.", this);
+            }
+            // Check Player/Weapon exclusion
+            else if (IsIgnoredCollider(hit.collider))
+            {
+                Debug.Log($"[Probe Debug] Spear sweep touched '{hit.collider.name}' but it was EXCLUDED because it belongs to the player, weapon controller, or probe game object itself.", this);
+            }
+        }
+    }
+
+    private void DebugOverlapExclusions(Vector3 origin, float radius)
+    {
+        // Query ALL layers to log exclusions
+        Collider2D[] colliders = Physics2D.OverlapCircleAll(origin, radius, ~0);
+        foreach (var col in colliders)
+        {
+            if (col == null) continue;
+
+            // Check LayerMask exclusion
+            if ((terrainLayers.value & (1 << col.gameObject.layer)) == 0)
+            {
+                Debug.Log($"[Probe Debug] Overlap touched '{col.name}' but it was EXCLUDED because its layer '{LayerMask.LayerToName(col.gameObject.layer)}' is not in terrainLayers.", this);
+            }
+            // Check Player/Weapon exclusion
+            else if (IsIgnoredCollider(col))
+            {
+                Debug.Log($"[Probe Debug] Overlap touched '{col.name}' but it was EXCLUDED because it belongs to the player, weapon controller, or probe game object itself.", this);
+            }
         }
     }
 
@@ -145,51 +229,94 @@ public sealed class WeaponTerrainProbe2D : MonoBehaviour
         return false;
     }
 
+    private void UpdateDebugFields(WeaponState state, Vector3 origin, Vector3 dir, float dist)
+    {
+        debugActiveState = state;
+        debugStartPoint = origin;
+        debugDirection = dir;
+        debugDistance = dist;
+        debugIsContact = IsContact;
+        debugContactPoint = ContactPoint;
+        debugContactNormal = ContactNormal;
+        debugContactColliderName = ContactCollider != null ? ContactCollider.name : "None";
+        debugContactColliderLayerName = ContactCollider != null ? LayerMask.LayerToName(ContactCollider.gameObject.layer) : "None";
+    }
+
     private void OnDrawGizmos()
     {
-        if (weaponController == null)
+        // Calculate Gizmo color based on config and state
+        bool isConfigValid = terrainLayers.value != 0 && (debugActiveState != WeaponState.Spear || debugDistance > 0f);
+        if (!isConfigValid)
+        {
+            Gizmos.color = Color.red;
+        }
+        else
+        {
+            Gizmos.color = debugIsContact ? Color.green : Color.yellow;
+        }
+
+        if (debugActiveState == WeaponState.BareHand)
         {
             return;
         }
 
-        WeaponState state = weaponController.CurrentState;
-        if (state == WeaponState.BareHand)
+        Vector3 start = debugStartPoint;
+        Vector3 dir = debugDirection;
+        float dist = debugDistance;
+
+        if (dir.sqrMagnitude < 0.0001f)
         {
-            return;
+            dir = transform.right;
         }
 
-        Vector3 originPos = probeOrigin != null ? probeOrigin.position : transform.position;
-        Vector3 aimDir = probeOrigin != null ? probeOrigin.right : transform.right;
-
-        Gizmos.color = IsContact ? Color.red : Color.yellow;
-
-        switch (state)
+        switch (debugActiveState)
         {
             case WeaponState.Spear:
-                // Draw path of the Spear CircleCast
-                Vector3 endPos = originPos + aimDir * spearProbeLength;
-                Gizmos.DrawLine(originPos, endPos);
-                Gizmos.DrawWireSphere(originPos, spearProbeRadius);
-                Gizmos.DrawWireSphere(endPos, spearProbeRadius);
+                // Draw path of the Spear capsule
+                Vector3 end = start + dir * dist;
+                Gizmos.DrawLine(start, end);
+                
+                // Draw side edges to resemble a true capsule along spear orientation
+                Vector3 sideOffset = new Vector3(-dir.y, dir.x, 0f) * spearProbeRadius;
+                Gizmos.DrawLine(start + sideOffset, end + sideOffset);
+                Gizmos.DrawLine(start - sideOffset, end - sideOffset);
+
+                Gizmos.DrawWireSphere(start, spearProbeRadius);
+                Gizmos.DrawWireSphere(end, spearProbeRadius);
+
+                // Start and End Cross markers
+                DrawCross(start, 0.08f);
+                DrawCross(end, 0.08f);
                 break;
 
             case WeaponState.Boomerang:
                 if (enableBoomerangProbe)
                 {
-                    Gizmos.DrawWireSphere(originPos, boomerangProbeRadius);
+                    Gizmos.DrawWireSphere(start, boomerangProbeRadius);
+                    DrawCross(start, 0.08f);
                 }
                 break;
 
             case WeaponState.Scissors:
-                Gizmos.DrawWireSphere(originPos, scissorsProbeRadius);
+                Gizmos.DrawWireSphere(start, scissorsProbeRadius);
+                DrawCross(start, 0.08f);
                 break;
         }
 
-        if (IsContact)
+        // Draw explicit contact point and normal line
+        if (debugIsContact)
         {
             Gizmos.color = Color.green;
-            Gizmos.DrawSphere(ContactPoint, 0.12f);
-            Gizmos.DrawRay(ContactPoint, ContactNormal * 0.4f);
+            // Draw a distinct solid sphere and outline circle at the hit location
+            Gizmos.DrawSphere(debugContactPoint, 0.08f);
+            Gizmos.DrawWireSphere(debugContactPoint, 0.15f);
+            Gizmos.DrawRay(debugContactPoint, debugContactNormal * 0.5f);
         }
+    }
+
+    private void DrawCross(Vector3 position, float size)
+    {
+        Gizmos.DrawLine(position - Vector3.right * size, position + Vector3.right * size);
+        Gizmos.DrawLine(position - Vector3.up * size, position + Vector3.up * size);
     }
 }
