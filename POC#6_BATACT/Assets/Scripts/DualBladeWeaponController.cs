@@ -65,7 +65,6 @@ public sealed class DualBladeWeaponController : MonoBehaviour
     [SerializeField] private float weaponBlockProbeRadius = 0.08f;
     [SerializeField] private float weaponBlockSkin = 0.04f;
     [SerializeField] private float bladeCastBaseLength = 1.15f;
-    [SerializeField] private float minimumBlockedBladeScale = 0.08f;
     [SerializeField] private float blockedAttackHoldSeconds = 0.045f;
     [SerializeField] private bool blockOnlyStaticOrKinematicBodies = true;
 
@@ -1010,14 +1009,9 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         }
 
         float allowedReach = Mathf.Max(0f, closestDistance - weaponBlockSkin);
-        float halfBladeLength = bladeCastBaseLength * Mathf.Max(minimumBlockedBladeScale, desiredScale) * 0.5f;
+        float halfBladeLength = bladeCastBaseLength * Mathf.Max(0f, desiredScale) * 0.5f;
         result.distanceFromPivot = Mathf.Clamp(allowedReach - halfBladeLength, 0f, desiredDistance);
-
-        float remainingLength = Mathf.Max(0f, allowedReach - result.distanceFromPivot);
-        result.lengthScale = Mathf.Clamp(
-            remainingLength / Mathf.Max(0.01f, bladeCastBaseLength),
-            minimumBlockedBladeScale,
-            desiredScale);
+        result.lengthScale = desiredScale;
 
         bladeTerrainContact = true;
         bladeTerrainContactPoint = closestHit.point;
