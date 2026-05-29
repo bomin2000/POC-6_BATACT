@@ -251,7 +251,7 @@ MonoBehaviour:
   groundCheckSize: {x: 0.7, y: 0.12}
   groundLayers:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 128
   hopWhenBlocked: 1
   wallCheckOffset: {x: 0.55, y: -0.15}
   wallCheckSize: {x: 0.18, y: 0.8}

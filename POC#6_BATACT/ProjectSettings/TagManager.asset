@@ -11,14 +11,14 @@ TagManager:
   - Enemy
   - Water
   - UI
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
+  - Player
+  - Ground
+  - PlayerWeapon
+  - PlayerAttacHitBox
+  - WeaponTerrainProbe
+  - EnemyAttackHitbox
+  - Projectile
+  - TriggerZone
   - 
   - 
   - 

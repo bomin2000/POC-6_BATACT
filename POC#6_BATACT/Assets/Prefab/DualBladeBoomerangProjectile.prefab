@@ -353,7 +353,7 @@ MonoBehaviour:
   arcHeight: 1.4
   targetLayers:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 8
 --- !u!1 &7577888744265294071
 GameObject:
   m_ObjectHideFlags: 0
