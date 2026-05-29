@@ -29,6 +29,7 @@ public sealed class PlayerHealth : MonoBehaviour
 
     private Rigidbody2D body;
     private PlayerTopDownMovement movement;
+    private DualBladeWeaponController weaponController;
     private Collider2D[] colliders;
     private Color[] originalColors;
     private Vector3 initialPosition;
@@ -45,6 +46,7 @@ public sealed class PlayerHealth : MonoBehaviour
     {
         body = GetComponent<Rigidbody2D>();
         movement = GetComponent<PlayerTopDownMovement>();
+        weaponController = GetComponent<DualBladeWeaponController>();
         colliders = GetComponentsInChildren<Collider2D>();
         initialPosition = transform.position;
 
@@ -69,6 +71,21 @@ public sealed class PlayerHealth : MonoBehaviour
         {
             invulnerableTimer -= Time.deltaTime;
         }
+    }
+
+    public bool IsHurtboxCollider(Collider2D candidate)
+    {
+        if (candidate == null)
+        {
+            return false;
+        }
+
+        if (weaponController != null && weaponController.ContainsWeaponCollider(candidate))
+        {
+            return false;
+        }
+
+        return candidate.GetComponentInParent<PlayerHealth>() == this;
     }
 
     public bool TryTakeDamage(float damage, Vector2 impulse, GameObject source)

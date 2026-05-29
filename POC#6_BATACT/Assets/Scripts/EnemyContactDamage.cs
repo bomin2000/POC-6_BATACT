@@ -33,6 +33,11 @@ public sealed class EnemyContactDamage : MonoBehaviour
             return;
         }
 
+        if (!player.IsHurtboxCollider(other))
+        {
+            return;
+        }
+
         Vector2 direction = player.transform.position - transform.position;
         if (direction.sqrMagnitude < 0.0001f)
         {
