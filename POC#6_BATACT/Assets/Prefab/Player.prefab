@@ -186,6 +186,8 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 8
   drawGizmos: 1
+  weaponController: {fileID: 0}
+  previewColor: {r: 1, g: 0.4, b: 0, a: 0.8}
 --- !u!1 &2448552729698543968
 GameObject:
   m_ObjectHideFlags: 0
@@ -495,6 +497,7 @@ GameObject:
   - component: {fileID: 6823378734003863881}
   - component: {fileID: 1703012761688660984}
   - component: {fileID: 2746492399404766922}
+  - component: {fileID: 2481130201076308353}
   m_Layer: 6
   m_Name: Player
   m_TagString: Untagged
@@ -636,7 +639,7 @@ CapsuleCollider2D:
   m_Enabled: 1
   serializedVersion: 3
   m_Density: 1
-  m_Material: {fileID: 0}
+  m_Material: {fileID: 6200000, guid: 26e07b70719879e42ae45b3bcd76b806, type: 2}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -737,6 +740,30 @@ MonoBehaviour:
   Respawned:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &2481130201076308353
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4615884595108132435}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 11c2de46da4dae94bb47d2f395ced788, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ScissorsTerrainGripAssist
+  terrainProbe: {fileID: 1865068627144009398}
+  isActive: 1
+  attackKey: 323
+  gripDuration: 0.15
+  gripVelocityDamping: 0.5
+  gripCooldown: 0.4
+  enableDebugLogging: 0
+  debugCanGrip: 0
+  debugIsGripping: 0
+  debugLastGripCollider: {fileID: 0}
+  debugLastGripTime: -999
+  debugGripBlockReason: 
 --- !u!1 &5105635373414431685
 GameObject:
   m_ObjectHideFlags: 0
@@ -923,6 +950,7 @@ MonoBehaviour:
   debugDirection: {x: 0, y: 0, z: 0}
   debugDistance: 0
   debugIsContact: 0
+  debugContactDirection: 
   debugContactPoint: {x: 0, y: 0}
   debugContactNormal: {x: 0, y: 0}
   debugContactColliderName: 
