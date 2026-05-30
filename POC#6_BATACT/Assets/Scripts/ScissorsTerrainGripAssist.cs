@@ -5,6 +5,8 @@ public class ScissorsTerrainGripAssist : MonoBehaviour
 {
     [Header("References")]
     [SerializeField] private WeaponTerrainProbe2D terrainProbe;
+    [SerializeField] private PlayerTopDownMovement playerMovement;
+    [SerializeField] private WeaponEscapeSpaceChecker2D spaceChecker;
 
     [Header("Grip Settings")]
     [SerializeField] private bool isActive = true;
@@ -30,6 +32,8 @@ public class ScissorsTerrainGripAssist : MonoBehaviour
     [SerializeField] private float debugLastGripTime = -999f;
     [SerializeField] private string debugGripBlockReason;
 
+    public bool IsGripping => debugIsGripping;
+
     private Rigidbody2D body;
     private int groundLayer;
     private float currentGripTimer;
@@ -43,6 +47,9 @@ public class ScissorsTerrainGripAssist : MonoBehaviour
         {
             terrainProbe = GetComponentInChildren<WeaponTerrainProbe2D>();
         }
+
+        if (playerMovement == null) playerMovement = GetComponent<PlayerTopDownMovement>();
+        if (spaceChecker == null) spaceChecker = GetComponent<WeaponEscapeSpaceChecker2D>();
     }
 
     private void Update()
@@ -115,6 +122,17 @@ public class ScissorsTerrainGripAssist : MonoBehaviour
             return;
         }
 
+        if (spaceChecker != null)
+        {
+            Vector2 normal = terrainProbe.ContactNormal;
+            Vector2 facingDir = playerMovement != null ? new Vector2(playerMovement.FacingSign, 0f) : Vector2.right;
+            if (!spaceChecker.TryFindSafeEscapeDirection(normal, facingDir, out Vector2 _))
+            {
+                SetBlockReason("Blocked / No Escape Space");
+                return;
+            }
+        }
+
         // All checks passed, trigger the Grip!
         debugCanGrip = true;
         debugIsGripping = true;
@@ -138,6 +156,17 @@ public class ScissorsTerrainGripAssist : MonoBehaviour
         { 
             debugGripBlockReason = "Contact Not Ground"; 
             return; 
+        }
+
+        if (spaceChecker != null)
+        {
+            Vector2 normal = terrainProbe.ContactNormal;
+            Vector2 facingDir = playerMovement != null ? new Vector2(playerMovement.FacingSign, 0f) : Vector2.right;
+            if (!spaceChecker.TryFindSafeEscapeDirection(normal, facingDir, out Vector2 _))
+            {
+                debugGripBlockReason = "Blocked / No Escape Space";
+                return;
+            }
         }
         
         if (Time.time < debugLastGripTime + gripCooldown)

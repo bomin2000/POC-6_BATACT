@@ -109,6 +109,7 @@ public sealed class WeaponHitbox2D : MonoBehaviour
         for (int i = 0; i < hitCount; i++)
         {
             Collider2D target = overlapBuffer[i];
+            Debug.Log($"WeaponHitbox2D Hit: {target.name} at center {center}");
             if (target == null || hitThisSwing.Contains(target))
             {
                 continue;

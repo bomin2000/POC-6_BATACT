@@ -498,6 +498,9 @@ GameObject:
   - component: {fileID: 1703012761688660984}
   - component: {fileID: 2746492399404766922}
   - component: {fileID: 2481130201076308353}
+  - component: {fileID: 3500458010252319854}
+  - component: {fileID: 5669863747322986202}
+  - component: {fileID: 2203174731317011125}
   m_Layer: 6
   m_Name: Player
   m_TagString: Untagged
@@ -602,6 +605,7 @@ MonoBehaviour:
   scissorsCloseAngleByCombo:
   - 8
   - 0
+  contactLimiter: {fileID: 3500458010252319854}
 --- !u!50 &3951122699985674552
 Rigidbody2D:
   serializedVersion: 5
@@ -753,6 +757,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ScissorsTerrainGripAssist
   terrainProbe: {fileID: 1865068627144009398}
+  playerMovement: {fileID: 0}
+  spaceChecker: {fileID: 0}
   isActive: 1
   attackKey: 323
   gripDuration: 0.15
@@ -764,6 +770,77 @@ MonoBehaviour:
   debugLastGripCollider: {fileID: 0}
   debugLastGripTime: -999
   debugGripBlockReason: 
+--- !u!114 &3500458010252319854
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4615884595108132435}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ae944b8878e19b7458291ff6a74aa405, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::WeaponTerrainContactLimiter2D
+  terrainProbe: {fileID: 0}
+  isActive: 1
+  scissorsBladeMargin: 0.5
+  debugIsLimitingAim: 0
+  debugIsLimitingPivot: 0
+  debugActiveState: 0
+  debugContactNormal: {x: 0, y: 0}
+  debugOriginalAim: {x: 0, y: 0}
+  debugLimitedAim: {x: 0, y: 0}
+  debugLimiterReason: 
+--- !u!114 &5669863747322986202
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4615884595108132435}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 92fde6fb56e84cb4190a1cefe6e7281f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::WeaponVerticalEscapeAssist
+  terrainProbe: {fileID: 0}
+  spearAssist: {fileID: 0}
+  scissorsAssist: {fileID: 0}
+  contactLimiter: {fileID: 0}
+  playerMovement: {fileID: 0}
+  spaceChecker: {fileID: 0}
+  enableVerticalEscape: 1
+  verticalEscapeSpeed: 8
+  verticalEscapeAcceleration: 30
+  verticalEscapeMaxDuration: 0.5
+  verticalEscapeCooldown: 0.2
+  jitterFrameThreshold: 12
+  jitterVelocityThreshold: 0.5
+  debugIsEscaping: 0
+  debugConsecutiveFrames: 0
+  debugAccumulatedContactTime: 0
+  debugLastEscapeDirection: {x: 0, y: 0}
+  debugLastEscapeSpeed: 0
+  debugBlockReason: 
+--- !u!114 &2203174731317011125
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4615884595108132435}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6dcfe73a6d277f943ba4de4e99a874d5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::WeaponEscapeSpaceChecker2D
+  playerCollider: {fileID: 0}
+  escapeCheckDistance: 0.2
+  debugHasEscapeSpace: 0
+  debugSelectedEscapeDirection: {x: 0, y: 0}
+  debugLastBlockedReason: None
+  debugLastOverlapColliderName: None
 --- !u!1 &5105635373414431685
 GameObject:
   m_ObjectHideFlags: 0
@@ -955,6 +1032,8 @@ MonoBehaviour:
   debugContactNormal: {x: 0, y: 0}
   debugContactColliderName: 
   debugContactColliderLayerName: 
+  debugSpearFwdContact: 0
+  debugSpearBwdContact: 0
 --- !u!1 &6564213864081385523
 GameObject:
   m_ObjectHideFlags: 0

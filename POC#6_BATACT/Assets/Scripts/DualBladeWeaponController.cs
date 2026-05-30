@@ -104,6 +104,9 @@ public sealed class DualBladeWeaponController : MonoBehaviour
     private float bufferedAttackTime;
     private PlayerTopDownMovement playerMovement;
 
+    [Header("Optional Extensions")]
+    public WeaponTerrainContactLimiter2D contactLimiter;
+
     private void Awake()
     {
         UpgradeLegacyPoseDefaults();
@@ -162,11 +165,23 @@ public sealed class DualBladeWeaponController : MonoBehaviour
             {
                 int aimSign = toMouse.x >= 0f ? 1 : -1;
                 aimDirection = ClampAimToFacingHemisphere(toMouse.normalized, aimSign);
+                
+                if (contactLimiter != null)
+                {
+                    aimDirection = contactLimiter.LimitAimDirection(aimDirection, CurrentState);
+                }
+                
                 ApplySideViewWeaponFacing(aimSign, aimDirection);
             }
             else
             {
                 aimDirection = toMouse.normalized;
+                
+                if (contactLimiter != null)
+                {
+                    aimDirection = contactLimiter.LimitAimDirection(aimDirection, CurrentState);
+                }
+                
                 weaponRoot.right = aimDirection;
             }
         }
@@ -535,6 +550,12 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         }
 
         Vector3 targetPivot = GetPivotPosition(visibleForm) + attackPivotOffset;
+        
+        if (contactLimiter != null)
+        {
+            targetPivot = contactLimiter.LimitPivotOffset(targetPivot, visibleForm, weaponRoot);
+        }
+
         BladePose pose = GetPose(visibleForm);
         pose.upperBladeAngle += attackUpperAngleOffset;
         pose.lowerBladeAngle += attackLowerAngleOffset;

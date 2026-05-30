@@ -6,6 +6,7 @@ public class SpearTerrainMovementAssist : MonoBehaviour
     [Header("References")]
     [SerializeField] private WeaponTerrainProbe2D terrainProbe;
     [SerializeField] private PlayerTopDownMovement playerMovement;
+    [SerializeField] private WeaponEscapeSpaceChecker2D spaceChecker;
     
     [Header("Resistance Settings")]
     [SerializeField] private bool isActive = true;
@@ -50,6 +51,9 @@ public class SpearTerrainMovementAssist : MonoBehaviour
     [SerializeField] private Vector2 debugLastVaultImpulse;
     [SerializeField] private string debugVaultBlockReason;
 
+    public bool IsActivelyAssisting => debugCorrectionApplied;
+    public float LastVaultTime => debugLastVaultTime;
+
     private Rigidbody2D body;
     private int groundLayer;
 
@@ -60,6 +64,7 @@ public class SpearTerrainMovementAssist : MonoBehaviour
 
         if (terrainProbe == null) terrainProbe = GetComponentInChildren<WeaponTerrainProbe2D>();
         if (playerMovement == null) playerMovement = GetComponent<PlayerTopDownMovement>();
+        if (spaceChecker == null) spaceChecker = GetComponent<WeaponEscapeSpaceChecker2D>();
     }
 
     private void Update()
@@ -117,10 +122,18 @@ public class SpearTerrainMovementAssist : MonoBehaviour
             return;
         }
 
+        Vector2 normal = terrainProbe.ContactNormal;
+        Vector2 facingDir = new Vector2(playerMovement.FacingSign, 0f);
+
+        if (spaceChecker != null && !spaceChecker.TryFindSafeEscapeDirection(normal, facingDir, out Vector2 _))
+        {
+            debugVaultBlockReason = "Blocked / No Escape Space";
+            return;
+        }
+
         // Vault is valid
         debugCanVault = true;
         debugLastVaultTime = Time.time;
-        Vector2 normal = terrainProbe.ContactNormal;
         Vector2 impulse = Vector2.zero;
         int facingSign = playerMovement.FacingSign;
 
@@ -193,6 +206,13 @@ public class SpearTerrainMovementAssist : MonoBehaviour
         float velocityIntoTerrain = Vector2.Dot(currentVelocity, pushDirection);
 
         if (velocityIntoTerrain <= 0.01f) { SetBlockReason("No Velocity Toward Contact"); return; }
+
+        Vector2 facingDir = new Vector2(playerMovement.FacingSign, 0f);
+        if (spaceChecker != null && !spaceChecker.TryFindSafeEscapeDirection(normal, facingDir, out Vector2 _))
+        {
+            SetBlockReason("Blocked / No Escape Space");
+            return;
+        }
 
         debugBlockReason = "None";
         debugCorrectionApplied = true;

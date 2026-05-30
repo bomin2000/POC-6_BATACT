@@ -35,13 +35,34 @@ public sealed class WeaponTerrainProbe2D : MonoBehaviour
     [SerializeField] private Vector2 debugContactNormal;
     [SerializeField] private string debugContactColliderName;
     [SerializeField] private string debugContactColliderLayerName;
+    
+    [Header("Spear Detailed Debug (Read-Only)")]
+    [SerializeField] private bool debugSpearFwdContact;
+    [SerializeField] private bool debugSpearBwdContact;
 
     // Public properties exposing collision status to other scripts/events
     public bool IsContact { get; private set; }
     public Vector2 ContactPoint { get; private set; }
     public Vector2 ContactNormal { get; private set; }
     public Collider2D ContactCollider { get; private set; }
+    
+    // Detailed Spear Properties
+    public bool SpearFwdContact { get; private set; }
+    public Vector2 SpearFwdPoint { get; private set; }
+    public Vector2 SpearFwdNormal { get; private set; }
+    public Collider2D SpearFwdCollider { get; private set; }
+    
+    public bool SpearBwdContact { get; private set; }
+    public Vector2 SpearBwdPoint { get; private set; }
+    public Vector2 SpearBwdNormal { get; private set; }
+    public Collider2D SpearBwdCollider { get; private set; }
+    
     public WeaponState ActiveState => weaponController != null ? weaponController.CurrentState : WeaponState.BareHand;
+
+    // Geometric data for accurate limiters
+    public Vector3 ProbeOrigin => probeOrigin != null ? probeOrigin.position : transform.position;
+    public float SpearProbeLength => spearProbeLength;
+    public float SpearProbeRadius => spearProbeRadius;
 
     private bool hasWarnedLayers = false;
 
@@ -87,6 +108,11 @@ public sealed class WeaponTerrainProbe2D : MonoBehaviour
         ContactNormal = Vector2.zero;
         ContactCollider = null;
         debugContactDirection = "None";
+        
+        SpearFwdContact = false;
+        SpearFwdCollider = null;
+        SpearBwdContact = false;
+        SpearBwdCollider = null;
 
         if (weaponController == null)
         {
@@ -150,6 +176,22 @@ public sealed class WeaponTerrainProbe2D : MonoBehaviour
 
         bool fwdValid = hitFwd.collider != null && !IsIgnoredCollider(hitFwd.collider);
         bool bwdValid = hitBwd.collider != null && !IsIgnoredCollider(hitBwd.collider);
+
+        if (fwdValid)
+        {
+            SpearFwdContact = true;
+            SpearFwdPoint = hitFwd.point;
+            SpearFwdNormal = hitFwd.normal;
+            SpearFwdCollider = hitFwd.collider;
+        }
+
+        if (bwdValid)
+        {
+            SpearBwdContact = true;
+            SpearBwdPoint = hitBwd.point;
+            SpearBwdNormal = hitBwd.normal;
+            SpearBwdCollider = hitBwd.collider;
+        }
 
         if (fwdValid && bwdValid)
         {
@@ -267,6 +309,10 @@ public sealed class WeaponTerrainProbe2D : MonoBehaviour
         debugIsContact = IsContact;
         debugContactPoint = ContactPoint;
         debugContactNormal = ContactNormal;
+        
+        debugSpearFwdContact = SpearFwdContact;
+        debugSpearBwdContact = SpearBwdContact;
+
         debugContactColliderName = ContactCollider != null ? ContactCollider.name : "None";
         debugContactColliderLayerName = ContactCollider != null ? LayerMask.LayerToName(ContactCollider.gameObject.layer) : "None";
     }
@@ -292,11 +338,15 @@ public sealed class WeaponTerrainProbe2D : MonoBehaviour
         switch (debugActiveState)
         {
             case WeaponState.Spear:
-                Color fwdColor = isConfigValid ? (debugContactDirection == "Forward" ? Color.green : Color.yellow) : Color.red;
-                Color bwdColor = isConfigValid ? (debugContactDirection == "Backward" ? Color.green : Color.yellow) : Color.red;
+                // Draw Forward Probe
+                Gizmos.color = SpearFwdContact ? Color.green : Color.yellow;
+                Gizmos.DrawLine(debugStartPoint, debugStartPoint + debugDirection * debugDistance);
+                Gizmos.DrawWireSphere(debugStartPoint + debugDirection * debugDistance, spearProbeRadius);
 
-                DrawSpearCapsuleGizmo(start, dir, dist, spearProbeRadius, fwdColor);
-                DrawSpearCapsuleGizmo(start, -dir, dist, spearProbeRadius, bwdColor);
+                // Draw Backward Probe
+                Gizmos.color = SpearBwdContact ? new Color(0f, 0.8f, 1f) : new Color(1f, 0.5f, 0f); // Cyan if hit, Orange if miss
+                Gizmos.DrawLine(debugStartPoint, debugStartPoint - debugDirection * debugDistance);
+                Gizmos.DrawWireSphere(debugStartPoint - debugDirection * debugDistance, spearProbeRadius);
                 break;
 
             case WeaponState.Boomerang:
