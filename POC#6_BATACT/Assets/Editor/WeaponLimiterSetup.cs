@@ -38,6 +38,12 @@ public class WeaponLimiterSetup : Editor
                 spaceChecker = playerRoot.AddComponent<WeaponEscapeSpaceChecker2D>();
             }
 
+            PlayerWallSlideAssist wallSlideAssist = playerRoot.GetComponent<PlayerWallSlideAssist>();
+            if (wallSlideAssist == null)
+            {
+                wallSlideAssist = playerRoot.AddComponent<PlayerWallSlideAssist>();
+            }
+
             DualBladeWeaponController controller = playerRoot.GetComponent<DualBladeWeaponController>();
             if (controller != null)
             {

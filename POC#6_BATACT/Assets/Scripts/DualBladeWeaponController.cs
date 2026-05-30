@@ -62,6 +62,11 @@ public sealed class DualBladeWeaponController : MonoBehaviour
     [SerializeField] private float scissorsCutOpenSeconds = 0.13f;
     [SerializeField] private float scissorsCutLungeDistance = 0.25f;
 
+    [Header("Auto Attack (Click Hold)")]
+    [SerializeField] private float spearAutoAttackInterval = 0.4f;
+    [SerializeField] private float scissorsAutoAttackInterval = 0.5f;
+    [SerializeField] private float boomerangAutoAttackInterval = 0.6f;
+
     [Header("Combo Buffer")]
     [SerializeField] private bool enableComboBuffer = true;
     [SerializeField] private float comboResetSeconds = 0.7f;
@@ -103,6 +108,10 @@ public sealed class DualBladeWeaponController : MonoBehaviour
     private bool hasBufferedAttack;
     private float bufferedAttackTime;
     private PlayerTopDownMovement playerMovement;
+
+    [Header("Auto Attack Status (Read-Only)")]
+    [SerializeField] private float lastAutoAttackTime = -999f;
+    [SerializeField] private bool canAutoAttack;
 
     [Header("Optional Extensions")]
     public WeaponTerrainContactLimiter2D contactLimiter;
@@ -321,31 +330,48 @@ public sealed class DualBladeWeaponController : MonoBehaviour
 
     private void ReadAttackInput()
     {
-        if (!Input.GetKeyDown(attackKey))
+        bool isKeyDown = Input.GetKeyDown(attackKey);
+        bool isKeyHeld = Input.GetKey(attackKey);
+
+        if (!isKeyDown && !isKeyHeld)
         {
+            canAutoAttack = false;
             return;
         }
-
-        lastCatchRelevantInputTime = Time.time;
 
         if (CurrentState == WeaponState.BareHand)
         {
+            canAutoAttack = false;
             return;
         }
 
+        float currentInterval = 1f;
         switch (CurrentState)
         {
-            case WeaponState.Spear:
-                TryStartComboMeleeAttack(WeaponState.Spear, spearProfile);
-                break;
+            case WeaponState.Spear: currentInterval = spearAutoAttackInterval; break;
+            case WeaponState.Scissors: currentInterval = scissorsAutoAttackInterval; break;
+            case WeaponState.Boomerang: currentInterval = boomerangAutoAttackInterval; break;
+        }
 
-            case WeaponState.Scissors:
-                TryStartComboMeleeAttack(WeaponState.Scissors, scissorsProfile);
-                break;
+        canAutoAttack = Time.time >= lastAutoAttackTime + currentInterval;
 
-            case WeaponState.Boomerang:
-                ThrowBoomerang();
-                break;
+        if (isKeyDown || canAutoAttack)
+        {
+            lastCatchRelevantInputTime = Time.time;
+            lastAutoAttackTime = Time.time;
+
+            switch (CurrentState)
+            {
+                case WeaponState.Spear:
+                    TryStartComboMeleeAttack(WeaponState.Spear, spearProfile);
+                    break;
+                case WeaponState.Scissors:
+                    TryStartComboMeleeAttack(WeaponState.Scissors, scissorsProfile);
+                    break;
+                case WeaponState.Boomerang:
+                    ThrowBoomerang();
+                    break;
+            }
         }
     }
 
@@ -506,6 +532,7 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         comboState = nextState;
         comboIndex = 0;
         CurrentState = nextState;
+        lastAutoAttackTime = -999f;
 
         if (nextState != WeaponState.BareHand)
         {
