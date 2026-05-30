@@ -16,7 +16,7 @@ MonoBehaviour:
   shape: 1
   localOffset: {x: 0, y: 0}
   boxSize: {x: 0, y: 0}
-  radius: 0.75
+  radius: 1.2
   startupSeconds: 0
   activeSeconds: 0
   recoverySeconds: 0
