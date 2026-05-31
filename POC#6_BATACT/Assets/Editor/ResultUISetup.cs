@@ -61,7 +61,7 @@ public class ResultUISetup : MonoBehaviour
         soUI.FindProperty("resultText").objectReferenceValue = text;
         soUI.ApplyModifiedProperties();
 
-        bgObj.SetActive(false); // Hidden by default, script needs to handle turning it on if we hide the root
+        bgObj.SetActive(true); // Must be active so Awake/Update run. Script hides image/text.
 
         UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(UnityEngine.SceneManagement.SceneManager.GetActiveScene());
         
