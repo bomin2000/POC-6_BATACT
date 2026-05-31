@@ -2,10 +2,17 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+public enum WaveSpawnMode
+{
+    Sequential,
+    AllAtOnce
+}
+
 [System.Serializable]
 public struct EnemyWaveDefinition
 {
     public string waveName;
+    public WaveSpawnMode spawnMode;
     public int basicEnemyCount;
     public int fastEnemyCount;
     public int rangedEnemyCount;
@@ -66,9 +73,9 @@ public sealed class EnemySpawner : MonoBehaviour
         {
             waves = new EnemyWaveDefinition[]
             {
-                new EnemyWaveDefinition { waveName = "Wave 1", basicEnemyCount = 3, spawnInterval = 1f, waveDelay = 1f, nextWaveDelay = 2f },
-                new EnemyWaveDefinition { waveName = "Wave 2", basicEnemyCount = 1, fastEnemyCount = 2, spawnInterval = 1f, waveDelay = 1f, nextWaveDelay = 2f },
-                new EnemyWaveDefinition { waveName = "Wave 3", basicEnemyCount = 2, fastEnemyCount = 1, rangedEnemyCount = 2, spawnInterval = 1f, waveDelay = 1f, nextWaveDelay = 2f }
+                new EnemyWaveDefinition { waveName = "Wave 1", spawnMode = WaveSpawnMode.Sequential, basicEnemyCount = 3, spawnInterval = 1f, waveDelay = 1f, nextWaveDelay = 2f },
+                new EnemyWaveDefinition { waveName = "Wave 2", spawnMode = WaveSpawnMode.AllAtOnce, basicEnemyCount = 1, fastEnemyCount = 2, spawnInterval = 1f, waveDelay = 1f, nextWaveDelay = 2f },
+                new EnemyWaveDefinition { waveName = "Wave 3", spawnMode = WaveSpawnMode.Sequential, basicEnemyCount = 2, fastEnemyCount = 1, rangedEnemyCount = 2, spawnInterval = 1f, waveDelay = 1f, nextWaveDelay = 2f }
             };
         }
 
@@ -135,29 +142,41 @@ public sealed class EnemySpawner : MonoBehaviour
 
             debugEnemiesRemainingToSpawn = enemiesToSpawn.Count;
 
-            // Spawn one by one
-            for (int i = 0; i < enemiesToSpawn.Count; i++)
+            if (currentWave.spawnMode == WaveSpawnMode.AllAtOnce)
             {
-                // Wait if max alive reached
-                while (true)
+                debugState = $"동시 스폰 중 ({currentWave.waveName})";
+                for (int i = 0; i < enemiesToSpawn.Count; i++)
                 {
-                    CleanupDeadEntries();
-                    debugAliveEnemiesCount = aliveEnemies.Count;
-                    if (aliveEnemies.Count < maxAlive)
-                    {
-                        break;
-                    }
-                    debugState = "필드 적 초과, 스폰 대기 중";
-                    yield return new WaitForSeconds(0.5f);
+                    SpawnSpecificEnemy(enemiesToSpawn[i]);
+                    debugEnemiesRemainingToSpawn--;
                 }
-
-                debugState = $"적 생성 중 ({currentWave.waveName})";
-                SpawnSpecificEnemy(enemiesToSpawn[i]);
-                debugEnemiesRemainingToSpawn--;
-
-                if (i < enemiesToSpawn.Count - 1 && currentWave.spawnInterval > 0f)
+            }
+            else
+            {
+                // Sequential
+                for (int i = 0; i < enemiesToSpawn.Count; i++)
                 {
-                    yield return new WaitForSeconds(currentWave.spawnInterval);
+                    // Wait if max alive reached
+                    while (true)
+                    {
+                        CleanupDeadEntries();
+                        debugAliveEnemiesCount = aliveEnemies.Count;
+                        if (aliveEnemies.Count < maxAlive)
+                        {
+                            break;
+                        }
+                        debugState = "필드 적 초과, 스폰 대기 중";
+                        yield return new WaitForSeconds(0.5f);
+                    }
+
+                    debugState = $"순차 스폰 중 ({currentWave.waveName})";
+                    SpawnSpecificEnemy(enemiesToSpawn[i]);
+                    debugEnemiesRemainingToSpawn--;
+
+                    if (i < enemiesToSpawn.Count - 1 && currentWave.spawnInterval > 0f)
+                    {
+                        yield return new WaitForSeconds(currentWave.spawnInterval);
+                    }
                 }
             }
 

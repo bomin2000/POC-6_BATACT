@@ -46,16 +46,8 @@ public class WaveStatusUI : MonoBehaviour
         int remainingToSpawn = spawner.EnemiesRemainingToSpawn;
         int alive = spawner.AliveEnemiesCount;
         int totalRemaining = remainingToSpawn + alive;
-        string state = spawner.CurrentState;
 
-        // If waiting to clear, highlight it
-        if (state.Contains("클리어") || state.Contains("대기"))
-        {
-            waveText.text = $"<color=#FFD700>{waveName}</color>\n<size=70%>상태: {state}</size>";
-        }
-        else
-        {
-            waveText.text = $"<color=#FFD700>{waveName}</color>\n<size=80%>남은 적: {totalRemaining}</size>\n<size=60%>{state}</size>";
-        }
+        // Simplify UI to show only Name and Enemies Left
+        waveText.text = $"<color=#FFD700>{waveName}</color>\n<size=80%>남은 적: {totalRemaining}</size>";
     }
 }
