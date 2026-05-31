@@ -149,20 +149,43 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemySpawner
   enemyPrefab: {fileID: 5576281405834939419, guid: b663cba4de015ca47903f49cf7165a10, type: 3}
-  rangedEnemyPrefab: {fileID: 4914019361791870253, guid: 04ce0418552ac87448280eebbe5c0c82, type: 3}
-  rangedSpawnChance: 0.3
   fastEnemyPrefab: {fileID: 79387391968581442, guid: 90338271701483345a9b85618ab42bab, type: 3}
-  fastSpawnChance: 0.3
+  rangedEnemyPrefab: {fileID: 4914019361791870253, guid: 04ce0418552ac87448280eebbe5c0c82, type: 3}
   target: {fileID: 465521168}
+  waves:
+  - waveName: "\uC815\uCC30\uB300"
+    basicEnemyCount: 0
+    fastEnemyCount: 5
+    rangedEnemyCount: 0
+    spawnInterval: 0.1
+    waveDelay: 1
+    nextWaveDelay: 0
+  - waveName: "\uC77C\uBC18 \uBD84\uB300"
+    basicEnemyCount: 2
+    fastEnemyCount: 1
+    rangedEnemyCount: 1
+    spawnInterval: 0.1
+    waveDelay: 1
+    nextWaveDelay: 0
+  - waveName: "\uC815\uC608 \uBD84\uB300"
+    basicEnemyCount: 3
+    fastEnemyCount: 0
+    rangedEnemyCount: 2
+    spawnInterval: 0.1
+    waveDelay: 1
+    nextWaveDelay: 0
+  loopWaves: 1
+  spawnOnStart: 1
   spawnPoints: []
   spawnRadius: 8
   spawnHeightOffset: 1
   minimumSpawnSpacing: 1.75
   spawnPositionAttempts: 8
   maxAlive: 3
-  initialDelay: 0.5
-  spawnInterval: 2.5
-  spawnOnStart: 1
+  debugCurrentWaveIndex: 0
+  debugEnemiesRemainingToSpawn: 0
+  debugAliveEnemiesCount: 0
+  debugState: 
 --- !u!4 &77987604
 Transform:
   m_ObjectHideFlags: 0
@@ -1376,8 +1399,8 @@ Transform:
   m_GameObject: {fileID: 1201178910}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -54.971897, y: -14.096701, z: 0}
-  m_LocalScale: {x: 15.324062, y: 1, z: 1}
+  m_LocalPosition: {x: -63.8118, y: -14.096701, z: 0}
+  m_LocalScale: {x: 33.003433, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1353266109}
@@ -2577,7 +2600,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 1069784010226506233, guid: 0a23648a50f3d674d962f1c3eecfd72f, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 5.7343
+      value: -20.76
       objectReference: {fileID: 0}
     - target: {fileID: 1069784010226506233, guid: 0a23648a50f3d674d962f1c3eecfd72f, type: 3}
       propertyPath: m_LocalPosition.y

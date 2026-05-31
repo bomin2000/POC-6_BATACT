@@ -2,15 +2,34 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+[System.Serializable]
+public struct EnemyWaveDefinition
+{
+    public string waveName;
+    public int basicEnemyCount;
+    public int fastEnemyCount;
+    public int rangedEnemyCount;
+    
+    [Tooltip("적 하나 스폰 후 대기 시간")]
+    public float spawnInterval;
+    [Tooltip("이 웨이브가 시작되기 전 대기 시간")]
+    public float waveDelay;
+    [Tooltip("이 웨이브의 적이 전멸한 후 다음 웨이브까지 대기 시간")]
+    public float nextWaveDelay;
+}
+
 public sealed class EnemySpawner : MonoBehaviour
 {
     [Header("Prefab")]
     [SerializeField] private GameObject enemyPrefab;
-    [SerializeField] private GameObject rangedEnemyPrefab;
-    [SerializeField] [Range(0f, 1f)] private float rangedSpawnChance = 0.3f;
     [SerializeField] private GameObject fastEnemyPrefab;
-    [SerializeField] [Range(0f, 1f)] private float fastSpawnChance = 0.3f;
+    [SerializeField] private GameObject rangedEnemyPrefab;
     [SerializeField] private Transform target;
+
+    [Header("Wave Settings")]
+    [SerializeField] private EnemyWaveDefinition[] waves;
+    [SerializeField] private bool loopWaves = false;
+    [SerializeField] private bool spawnOnStart = true;
 
     [Header("Spawn Points")]
     [SerializeField] private Transform[] spawnPoints;
@@ -21,9 +40,19 @@ public sealed class EnemySpawner : MonoBehaviour
 
     [Header("Rules")]
     [SerializeField] private int maxAlive = 3;
-    [SerializeField] private float initialDelay = 0.5f;
-    [SerializeField] private float spawnInterval = 2.5f;
-    [SerializeField] private bool spawnOnStart = true;
+
+    [Header("Debug Status (Read-Only)")]
+    [SerializeField] private int debugCurrentWaveIndex;
+    [SerializeField] private int debugEnemiesRemainingToSpawn;
+    [SerializeField] private int debugAliveEnemiesCount;
+    [SerializeField] private string debugState;
+
+    public int CurrentWaveIndex => debugCurrentWaveIndex;
+    public int EnemiesRemainingToSpawn => debugEnemiesRemainingToSpawn;
+    public int AliveEnemiesCount => debugAliveEnemiesCount;
+    public string CurrentState => debugState;
+    public EnemyWaveDefinition[] Waves => waves;
+    public bool HasWaves => waves != null && waves.Length > 0;
 
     private readonly List<PrototypeEnemyHitReceiver> aliveEnemies = new List<PrototypeEnemyHitReceiver>();
     private Coroutine spawnRoutine;
@@ -32,9 +61,20 @@ public sealed class EnemySpawner : MonoBehaviour
     {
         ResolveTarget();
 
+        // Create some default waves if empty, just so it works immediately
+        if (waves == null || waves.Length == 0)
+        {
+            waves = new EnemyWaveDefinition[]
+            {
+                new EnemyWaveDefinition { waveName = "Wave 1", basicEnemyCount = 3, spawnInterval = 1f, waveDelay = 1f, nextWaveDelay = 2f },
+                new EnemyWaveDefinition { waveName = "Wave 2", basicEnemyCount = 1, fastEnemyCount = 2, spawnInterval = 1f, waveDelay = 1f, nextWaveDelay = 2f },
+                new EnemyWaveDefinition { waveName = "Wave 3", basicEnemyCount = 2, fastEnemyCount = 1, rangedEnemyCount = 2, spawnInterval = 1f, waveDelay = 1f, nextWaveDelay = 2f }
+            };
+        }
+
         if (spawnOnStart)
         {
-            spawnRoutine = StartCoroutine(SpawnRoutine());
+            spawnRoutine = StartCoroutine(WaveRoutine());
         }
     }
 
@@ -47,25 +87,103 @@ public sealed class EnemySpawner : MonoBehaviour
         }
     }
 
-    public void SpawnOne()
+    private IEnumerator WaveRoutine()
+    {
+        debugCurrentWaveIndex = 0;
+
+        while (true)
+        {
+            if (waves == null || waves.Length == 0)
+            {
+                debugState = "No Waves Defined";
+                yield break;
+            }
+
+            if (debugCurrentWaveIndex >= waves.Length)
+            {
+                if (loopWaves)
+                {
+                    debugCurrentWaveIndex = 0;
+                }
+                else
+                {
+                    debugState = "All Waves Completed";
+                    yield break;
+                }
+            }
+
+            EnemyWaveDefinition currentWave = waves[debugCurrentWaveIndex];
+            debugState = $"Waiting for Wave Delay ({currentWave.waveName})";
+            yield return new WaitForSeconds(currentWave.waveDelay);
+
+            debugState = $"Spawning Wave ({currentWave.waveName})";
+            
+            // Prepare spawn list
+            List<GameObject> enemiesToSpawn = new List<GameObject>();
+            for (int i = 0; i < currentWave.basicEnemyCount; i++) if (enemyPrefab != null) enemiesToSpawn.Add(enemyPrefab);
+            for (int i = 0; i < currentWave.fastEnemyCount; i++) if (fastEnemyPrefab != null) enemiesToSpawn.Add(fastEnemyPrefab);
+            for (int i = 0; i < currentWave.rangedEnemyCount; i++) if (rangedEnemyPrefab != null) enemiesToSpawn.Add(rangedEnemyPrefab);
+
+            // Shuffle
+            for (int i = 0; i < enemiesToSpawn.Count; i++)
+            {
+                GameObject temp = enemiesToSpawn[i];
+                int randomIndex = Random.Range(i, enemiesToSpawn.Count);
+                enemiesToSpawn[i] = enemiesToSpawn[randomIndex];
+                enemiesToSpawn[randomIndex] = temp;
+            }
+
+            debugEnemiesRemainingToSpawn = enemiesToSpawn.Count;
+
+            // Spawn one by one
+            for (int i = 0; i < enemiesToSpawn.Count; i++)
+            {
+                // Wait if max alive reached
+                while (true)
+                {
+                    CleanupDeadEntries();
+                    debugAliveEnemiesCount = aliveEnemies.Count;
+                    if (aliveEnemies.Count < maxAlive)
+                    {
+                        break;
+                    }
+                    debugState = "Waiting for Max Alive Room";
+                    yield return new WaitForSeconds(0.5f);
+                }
+
+                debugState = $"Spawning Wave ({currentWave.waveName})";
+                SpawnSpecificEnemy(enemiesToSpawn[i]);
+                debugEnemiesRemainingToSpawn--;
+
+                if (i < enemiesToSpawn.Count - 1 && currentWave.spawnInterval > 0f)
+                {
+                    yield return new WaitForSeconds(currentWave.spawnInterval);
+                }
+            }
+
+            // Wait for all to die
+            debugState = "Waiting for enemies to be cleared";
+            while (true)
+            {
+                CleanupDeadEntries();
+                debugAliveEnemiesCount = aliveEnemies.Count;
+                if (aliveEnemies.Count == 0)
+                {
+                    break;
+                }
+                yield return new WaitForSeconds(0.5f);
+            }
+
+            debugState = "Wave Cleared! Waiting for next wave...";
+            yield return new WaitForSeconds(currentWave.nextWaveDelay);
+
+            debugCurrentWaveIndex++;
+        }
+    }
+
+    private void SpawnSpecificEnemy(GameObject prefabToSpawn)
     {
         CleanupDeadEntries();
-
-        if (enemyPrefab == null || aliveEnemies.Count >= maxAlive)
-        {
-            return;
-        }
-
-        GameObject prefabToSpawn = enemyPrefab;
-        float roll = Random.value;
-        if (rangedEnemyPrefab != null && roll <= rangedSpawnChance)
-        {
-            prefabToSpawn = rangedEnemyPrefab;
-        }
-        else if (fastEnemyPrefab != null && roll <= rangedSpawnChance + fastSpawnChance)
-        {
-            prefabToSpawn = fastEnemyPrefab;
-        }
 
         Vector3 position = GetSpawnPosition();
         GameObject enemyObject = Instantiate(prefabToSpawn, position, Quaternion.identity);
@@ -89,17 +207,8 @@ public sealed class EnemySpawner : MonoBehaviour
             aliveEnemies.Add(receiver);
             receiver.Died.AddListener(() => aliveEnemies.Remove(receiver));
         }
-    }
-
-    private IEnumerator SpawnRoutine()
-    {
-        yield return new WaitForSeconds(initialDelay);
-
-        while (enabled)
-        {
-            SpawnOne();
-            yield return new WaitForSeconds(spawnInterval);
-        }
+        
+        debugAliveEnemiesCount = aliveEnemies.Count;
     }
 
     private void ResolveTarget()
