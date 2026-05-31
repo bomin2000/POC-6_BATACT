@@ -3,7 +3,7 @@ using UnityEditor;
 
 public class FixSceneWaves : MonoBehaviour
 {
-    [MenuItem("Tools/Fix Scene Wave Settings")]
+    [MenuItem("Tools/Legacy Setups/Fix Scene Wave Settings")]
     public static void FixWaves()
     {
         EnemySpawner spawner = FindFirstObjectByType<EnemySpawner>();

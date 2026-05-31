@@ -21,6 +21,8 @@ public sealed class WeaponHitbox2D : MonoBehaviour
 
     public bool IsAttacking => attackRoutine != null;
 
+    public System.Action<Collider2D, WeaponHitboxProfile> OnHitSuccessful;
+
     public void Initialize(Transform ownerTransform)
     {
         owner = ownerTransform;
@@ -128,6 +130,17 @@ public sealed class WeaponHitbox2D : MonoBehaviour
                 target.bounds.center);
 
             receiver.ReceiveWeaponHit(profile.reaction, impulse, owner != null ? owner.gameObject : gameObject);
+            
+            OnHitSuccessful?.Invoke(target, profile);
+
+            if (profile.healOnHit > 0f && owner != null)
+            {
+                PlayerHealth health = owner.GetComponent<PlayerHealth>();
+                if (health != null)
+                {
+                    health.Heal(profile.healOnHit);
+                }
+            }
         }
     }
 

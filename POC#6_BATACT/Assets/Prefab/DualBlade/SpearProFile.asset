@@ -14,15 +14,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WeaponHitboxProfile
   state: 0
   shape: 0
-  localOffset: {x: 3, y: -0.1}
-  boxSize: {x: 3, y: 0.45}
+  localOffset: {x: 1.5, y: 0}
+  boxSize: {x: 2.5, y: 0.5}
   radius: 1.5
-  startupSeconds: 0.04
-  activeSeconds: 0.12
-  recoverySeconds: 0.16
+  startupSeconds: 0.1
+  activeSeconds: 0.15
+  recoverySeconds: 0.3
   reaction:
     reactionType: 0
-    damage: 5
-    knockbackForce: 14
-    stunSeconds: 0.1
+    damage: 40
+    knockbackForce: 25
+    stunSeconds: 0.15
     extraImpulse: {x: 0, y: 0}
+  healOnHit: 0

@@ -3,7 +3,7 @@ using UnityEditor;
 
 public class RangedEnemySetup : MonoBehaviour
 {
-    [MenuItem("Tools/Setup Ranged Enemy Prefabs")]
+    [MenuItem("Tools/Legacy Setups/Setup Ranged Enemy Prefabs")]
     public static void SetupRangedEnemy()
     {
         // 1. Create EnemyProjectile.prefab

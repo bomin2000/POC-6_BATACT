@@ -30,6 +30,7 @@ public sealed class DualBladeBoomerangProjectile : MonoBehaviour
     private bool returning;
     private bool initialized;
 
+    public bool IsReturning => returning;
     public System.Action<DualBladeBoomerangProjectile> Caught;
 
     private void Awake()
@@ -50,6 +51,25 @@ public sealed class DualBladeBoomerangProjectile : MonoBehaviour
         returning = false;
         initialized = true;
         hitTargets.Clear();
+
+        if (profile != null && profile.name.Contains("Empowered"))
+        {
+            transform.localScale = Vector3.one * 1.8f;
+            SpriteRenderer sr = GetComponentInChildren<SpriteRenderer>();
+            if (sr != null)
+            {
+                sr.color = new Color(1f, 0.5f, 0.5f); // Red tint for empowered
+            }
+        }
+        else
+        {
+            transform.localScale = Vector3.one;
+            SpriteRenderer sr = GetComponentInChildren<SpriteRenderer>();
+            if (sr != null)
+            {
+                sr.color = Color.white;
+            }
+        }
     }
 
     private void Update()

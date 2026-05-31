@@ -3,7 +3,7 @@ using UnityEditor;
 
 public class EnemyRoleSetup : MonoBehaviour
 {
-    [MenuItem("Tools/Setup Enemy Roles (Differentiate)")]
+    [MenuItem("Tools/Legacy Setups/Setup Enemy Roles (Differentiate)")]
     public static void ApplyRoles()
     {
         string[] paths = {

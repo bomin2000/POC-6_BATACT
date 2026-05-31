@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class ZeroFrictionSetup : Editor
 {
-    [MenuItem("Tools/Fix Player Wall Sticking")]
+    [MenuItem("Tools/Legacy Setups/Fix Player Wall Sticking")]
     public static void ApplyZeroFriction()
     {
         string materialPath = "Assets/PhysicsMaterials/ZeroFriction2D.physicsMaterial2D";

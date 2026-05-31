@@ -5,7 +5,7 @@ using TMPro;
 
 public class ResultUISetup : MonoBehaviour
 {
-    [MenuItem("Tools/Setup Game Result UI")]
+    [MenuItem("Tools/Legacy Setups/Setup Game Result UI")]
     public static void SetupResultUI()
     {
         Canvas canvas = FindFirstObjectByType<Canvas>();

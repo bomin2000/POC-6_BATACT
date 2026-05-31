@@ -6,7 +6,7 @@ public class ScissorsAssistSetup : Editor
 {
     private const string PlayerPrefabPath = "Assets/Prefab/Player.prefab";
 
-    [MenuItem("Tools/Setup Scissors Assist")]
+    [MenuItem("Tools/Legacy Setups/Setup Scissors Assist")]
     public static void SetupScissorsAssist()
     {
         GameObject prefabRoot = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);

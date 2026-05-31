@@ -3,7 +3,7 @@ using UnityEditor;
 
 public class ProjectileSetup : MonoBehaviour
 {
-    [MenuItem("Tools/Setup Projectile Visuals")]
+    [MenuItem("Tools/Legacy Setups/Setup Projectile Visuals")]
     public static void SetupProjectile()
     {
         string path = "Assets/Prefab/EnemyProjectile.prefab";

@@ -548,6 +548,10 @@ MonoBehaviour:
   spearProfile: {fileID: 11400000, guid: ea6cb80d989d359448a7a9ecb922d038, type: 2}
   boomerangProfile: {fileID: 11400000, guid: ca9614a23f9bffc4dbb3c41ec963321e, type: 2}
   scissorsProfile: {fileID: 11400000, guid: 47f08e2d0c8c74246b653fb09baf3a1e, type: 2}
+  spearChargeProfile: {fileID: 11400000, guid: 8854f44a5facfcd4ba05bae7954735f9, type: 2}
+  scissorsHoldProfile: {fileID: 11400000, guid: 5166eee66ec6f2144975e4a960b999f1, type: 2}
+  boomerangEmpoweredProfile: {fileID: 11400000, guid: 7808d5e33cddb4e43a6eeef47f7b409c, type: 2}
+  holdToChargeSeconds: 0.4
   forceWeaponRenderInFront: 1
   weaponSortingOrder: 20
   forceBladeCollidersAsTriggers: 1

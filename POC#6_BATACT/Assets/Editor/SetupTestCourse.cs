@@ -4,7 +4,7 @@ using System.Collections.Generic;
 
 public class SetupTestCourse : MonoBehaviour
 {
-    [MenuItem("Tools/Setup Test Course")]
+    [MenuItem("Tools/Legacy Setups/Setup Test Course")]
     public static void CreateCourse()
     {
         // 1. Clean up old course

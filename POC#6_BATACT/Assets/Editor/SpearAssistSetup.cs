@@ -6,7 +6,7 @@ public class SpearAssistSetup : Editor
 {
     private const string PlayerPrefabPath = "Assets/Prefab/Player.prefab";
 
-    [MenuItem("Tools/Setup Spear Assist")]
+    [MenuItem("Tools/Legacy Setups/Setup Spear Assist")]
     public static void SetupSpearAssist()
     {
         GameObject prefabRoot = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);

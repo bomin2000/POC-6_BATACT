@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class ReferenceDiagnostic : Editor
 {
-    [MenuItem("Tools/Run Diagnostics/Verify Spear Assist Links")]
+    [MenuItem("Tools/Legacy Setups/Run Diagnostics/Verify Spear Assist Links")]
     public static void VerifyLinks()
     {
         Debug.Log("<b>[Diagnostic] Starting Spear Assist Reference Check...</b>");

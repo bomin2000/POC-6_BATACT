@@ -21,6 +21,13 @@ public sealed class DualBladeWeaponController : MonoBehaviour
     public WeaponHitboxProfile BoomerangProfile => boomerangProfile;
     public WeaponHitboxProfile ScissorsProfile => scissorsProfile;
 
+    [Header("Secondary Action Profiles")]
+    [SerializeField] private WeaponHitboxProfile spearChargeProfile;
+    [SerializeField] private WeaponHitboxProfile scissorsHoldProfile;
+    [SerializeField] private WeaponHitboxProfile boomerangEmpoweredProfile;
+
+    private bool hasPerfectCatchBuff = false;
+
     [Header("Visual Debug")]
     [SerializeField] private bool forceWeaponRenderInFront = true;
     [SerializeField] private int weaponSortingOrder = 20;
@@ -44,7 +51,7 @@ public sealed class DualBladeWeaponController : MonoBehaviour
     [SerializeField] private KeyCode attackKey = KeyCode.Mouse0;
     [SerializeField] private bool wheelCyclesThroughBoomerang = true;
     [SerializeField] private bool allowNumberKeyMorph = true;
-    [SerializeField] private float perfectCatchInputWindow = 0.12f;
+    [SerializeField] private float perfectCatchInputWindow = 0.35f;
     [SerializeField] private float catchStabilizeSeconds = 0.12f;
 
     [Header("Side View Aiming")]
@@ -96,7 +103,6 @@ public sealed class DualBladeWeaponController : MonoBehaviour
     private DualBladeBoomerangProjectile activeBoomerang;
     private WeaponState visibleForm = WeaponState.Boomerang;
     private Vector2 aimDirection = Vector2.right;
-    private float lastCatchRelevantInputTime = -999f;
     private Coroutine meleeAnimationRoutine;
     private Vector3 attackPivotOffset;
     private float attackUpperAngleOffset;
@@ -107,6 +113,7 @@ public sealed class DualBladeWeaponController : MonoBehaviour
     private float lastComboTime = -999f;
     private bool hasBufferedAttack;
     private float bufferedAttackTime;
+    private WeaponHitboxProfile bufferedProfile;
     private PlayerTopDownMovement playerMovement;
 
     [Header("Auto Attack Status (Read-Only)")]
@@ -115,6 +122,10 @@ public sealed class DualBladeWeaponController : MonoBehaviour
 
     [Header("Optional Extensions")]
     public WeaponTerrainContactLimiter2D contactLimiter;
+
+    [Header("Combo Hit Tracking")]
+    [SerializeField] private int consecutiveHitCount = 0;
+    [SerializeField] private int requiredHitsForSecondary = 2; // e.g. 2 hits -> 3rd attack is secondary
 
     private void Awake()
     {
@@ -133,6 +144,7 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         if (meleeHitbox != null)
         {
             meleeHitbox.Initialize(transform);
+            meleeHitbox.OnHitSuccessful += HandleHitSuccessful;
         }
 
         playerMovement = GetComponent<PlayerTopDownMovement>();
@@ -148,12 +160,77 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         ConfigureBladeColliders();
     }
 
+    private void OnDestroy()
+    {
+        if (meleeHitbox != null)
+        {
+            meleeHitbox.OnHitSuccessful -= HandleHitSuccessful;
+        }
+    }
+
+    private void HandleHitSuccessful(Collider2D target, WeaponHitboxProfile profile)
+    {
+        // Only count hits from normal profiles, not secondary charge/hold profiles
+        if (profile == spearProfile || profile == scissorsProfile || profile == boomerangProfile)
+        {
+            consecutiveHitCount++;
+        }
+    }
+
+    private TextMesh comboTextMesh;
+
     private void Update()
     {
         UpdateAimDirection();
         ReadFormInput();
         ReadAttackInput();
         SmoothSnapVisibleForm();
+        UpdateComboIndicator();
+    }
+
+    private void EnsureComboIndicator()
+    {
+        if (comboTextMesh == null)
+        {
+            GameObject go = new GameObject("ComboIndicator");
+            go.transform.SetParent(transform);
+            go.transform.localPosition = new Vector3(0f, 1.6f, 0f); // slightly higher than catch indicator
+            
+            comboTextMesh = go.AddComponent<TextMesh>();
+            comboTextMesh.anchor = TextAnchor.MiddleCenter;
+            comboTextMesh.alignment = TextAlignment.Center;
+            comboTextMesh.fontSize = 60;
+            comboTextMesh.characterSize = 0.12f;
+            comboTextMesh.color = Color.white;
+            
+            MeshRenderer mr = go.GetComponent<MeshRenderer>();
+            mr.sortingOrder = 35; // Put on top
+        }
+    }
+
+    private void UpdateComboIndicator()
+    {
+        EnsureComboIndicator();
+
+        if (consecutiveHitCount == 0)
+        {
+            comboTextMesh.text = "";
+            return;
+        }
+
+        if (consecutiveHitCount >= requiredHitsForSecondary)
+        {
+            comboTextMesh.text = "SKILL READY!";
+            comboTextMesh.color = Color.Lerp(Color.yellow, Color.red, Mathf.PingPong(Time.time * 10f, 1f));
+            float scale = 1f + Mathf.PingPong(Time.time * 5f, 0.2f);
+            comboTextMesh.transform.localScale = new Vector3(scale, scale, 1f);
+        }
+        else
+        {
+            comboTextMesh.text = $"Hit {consecutiveHitCount}!";
+            comboTextMesh.color = Color.white;
+            comboTextMesh.transform.localScale = Vector3.one;
+        }
     }
 
     private void UpdateAimDirection()
@@ -289,7 +366,6 @@ public sealed class DualBladeWeaponController : MonoBehaviour
             return;
         }
 
-        lastCatchRelevantInputTime = Time.time;
         RequestMorph(requestedState.Value);
     }
 
@@ -333,12 +409,6 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         bool isKeyDown = Input.GetKeyDown(attackKey);
         bool isKeyHeld = Input.GetKey(attackKey);
 
-        if (!isKeyDown && !isKeyHeld)
-        {
-            canAutoAttack = false;
-            return;
-        }
-
         if (CurrentState == WeaponState.BareHand)
         {
             canAutoAttack = false;
@@ -355,23 +425,67 @@ public sealed class DualBladeWeaponController : MonoBehaviour
 
         canAutoAttack = Time.time >= lastAutoAttackTime + currentInterval;
 
-        if (isKeyDown || canAutoAttack)
+        // Reset hit count if combo drops
+        if (Time.time - lastComboTime > comboResetSeconds)
         {
-            lastCatchRelevantInputTime = Time.time;
-            lastAutoAttackTime = Time.time;
+            consecutiveHitCount = 0;
+        }
 
-            switch (CurrentState)
+        if (isKeyDown || (canAutoAttack && isKeyHeld))
+        {
+            if (canAutoAttack) 
             {
-                case WeaponState.Spear:
-                    TryStartComboMeleeAttack(WeaponState.Spear, spearProfile);
-                    break;
-                case WeaponState.Scissors:
-                    TryStartComboMeleeAttack(WeaponState.Scissors, scissorsProfile);
-                    break;
-                case WeaponState.Boomerang:
-                    ThrowBoomerang();
-                    break;
+                lastAutoAttackTime = Time.time;
             }
+            
+            // Check if we reached the required combo hits to fire the secondary skill
+            if (consecutiveHitCount >= requiredHitsForSecondary)
+            {
+                consecutiveHitCount = 0; // Reset after using skill
+                FireSecondaryAttack();
+            }
+            else
+            {
+                FirePrimaryAttack();
+            }
+        }
+    }
+
+    private void FirePrimaryAttack()
+    {
+        switch (CurrentState)
+        {
+            case WeaponState.Spear:
+                TryStartComboMeleeAttack(WeaponState.Spear, spearProfile);
+                break;
+            case WeaponState.Scissors:
+                TryStartComboMeleeAttack(WeaponState.Scissors, scissorsProfile);
+                break;
+            case WeaponState.Boomerang:
+                ThrowBoomerang();
+                break;
+        }
+    }
+
+    private void FireSecondaryAttack()
+    {
+        switch (CurrentState)
+        {
+            case WeaponState.Spear:
+                if (spearChargeProfile != null)
+                {
+                    TryStartComboMeleeAttack(WeaponState.Spear, spearChargeProfile);
+                }
+                break;
+            case WeaponState.Scissors:
+                if (scissorsHoldProfile != null)
+                {
+                    TryStartComboMeleeAttack(WeaponState.Scissors, scissorsHoldProfile);
+                }
+                break;
+            case WeaponState.Boomerang:
+                ThrowBoomerang(true);
+                break;
         }
     }
 
@@ -381,6 +495,7 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         {
             hasBufferedAttack = true;
             bufferedAttackTime = Time.time;
+            bufferedProfile = profile;
             return;
         }
 
@@ -420,7 +535,7 @@ public sealed class DualBladeWeaponController : MonoBehaviour
 
     private void StartMeleeAttack(WeaponState attackState, WeaponHitboxProfile profile, int attackComboIndex)
     {
-        PlayMeleeVisualAnimation(attackState, attackComboIndex);
+        PlayMeleeVisualAnimation(attackState, attackComboIndex, profile);
         TryStartMeleeHitbox(profile, attackState);
         lastComboTime = Time.time;
     }
@@ -450,14 +565,14 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         return weaponRoot.TransformVector(attackPivotOffset);
     }
 
-    private void PlayMeleeVisualAnimation(WeaponState attackState, int attackComboIndex)
+    private void PlayMeleeVisualAnimation(WeaponState attackState, int attackComboIndex, WeaponHitboxProfile profile)
     {
         if (meleeAnimationRoutine != null)
         {
             StopCoroutine(meleeAnimationRoutine);
         }
 
-        meleeAnimationRoutine = StartCoroutine(MeleeAnimationRoutine(attackState, attackComboIndex));
+        meleeAnimationRoutine = StartCoroutine(MeleeAnimationRoutine(attackState, attackComboIndex, profile));
     }
 
     public void RequestMorph(WeaponState targetState)
@@ -477,16 +592,18 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         TransitionTo(targetState);
     }
 
-    private void ThrowBoomerang()
+    private void ThrowBoomerang(bool isEmpowered = false)
     {
         if (boomerangPrefab == null || activeBoomerang != null)
         {
             return;
         }
 
+        WeaponHitboxProfile actualProfile = isEmpowered && boomerangEmpoweredProfile != null ? boomerangEmpoweredProfile : boomerangProfile;
+
         activeBoomerang = Instantiate(boomerangPrefab, throwSpawnPoint.position, Quaternion.identity);
         activeBoomerang.Caught += OnBoomerangCaught;
-        activeBoomerang.Launch(transform, boomerangProfile, aimDirection);
+        activeBoomerang.Launch(transform, actualProfile, aimDirection);
 
         TransitionTo(WeaponState.BareHand);
     }
@@ -501,12 +618,6 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         activeBoomerang.Caught -= OnBoomerangCaught;
         Destroy(activeBoomerang.gameObject);
         activeBoomerang = null;
-
-        bool perfectCatch = Time.time - lastCatchRelevantInputTime <= perfectCatchInputWindow;
-        if (perfectCatch)
-        {
-            Debug.Log("Perfect Catch: critical buff / dash cancel opportunity granted.");
-        }
 
         PlayerTopDownMovement movement = GetComponent<PlayerTopDownMovement>();
         if (movement != null)
@@ -685,17 +796,19 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         }
     }
 
-    private IEnumerator MeleeAnimationRoutine(WeaponState attackState, int attackComboIndex)
+    private IEnumerator MeleeAnimationRoutine(WeaponState attackState, int attackComboIndex, WeaponHitboxProfile profile)
     {
         ClearAttackOffsets();
+        bool isCharge = (profile == spearChargeProfile);
+        bool isHold = (profile == scissorsHoldProfile);
 
         if (attackState == WeaponState.Spear)
         {
-            yield return SpearThrustAnimation(attackComboIndex);
+            yield return SpearThrustAnimation(attackComboIndex, isCharge);
         }
         else if (attackState == WeaponState.Scissors)
         {
-            yield return ScissorsCutAnimation(attackComboIndex);
+            yield return ScissorsCutAnimation(attackComboIndex, isHold);
         }
 
         ClearAttackOffsets();
@@ -719,46 +832,77 @@ public sealed class DualBladeWeaponController : MonoBehaviour
             return;
         }
 
-        WeaponHitboxProfile profile = attackState == WeaponState.Spear ? spearProfile : scissorsProfile;
+        WeaponHitboxProfile profile = bufferedProfile != null ? bufferedProfile : (attackState == WeaponState.Spear ? spearProfile : scissorsProfile);
         int nextComboIndex = ResolveNextComboIndex(attackState);
         StartMeleeAttack(attackState, profile, nextComboIndex);
+        bufferedProfile = null;
     }
 
-    private IEnumerator SpearThrustAnimation(int attackComboIndex)
+    private IEnumerator SpearThrustAnimation(int attackComboIndex, bool isCharge)
     {
         float distanceMultiplier = GetComboArrayValue(spearThrustDistanceMultipliers, attackComboIndex, 1f);
         float stretchMultiplier = GetComboArrayValue(spearStretchMultipliers, attackComboIndex, 1f);
+        
+        if (isCharge)
+        {
+            distanceMultiplier *= 3.0f;
+            stretchMultiplier *= 2.5f;
+        }
+
         float thrustDistance = spearThrustDistance * distanceMultiplier;
         float thrustStretch = spearThrustStretch * stretchMultiplier;
+        
+        float outSeconds = isCharge ? spearThrustOutSeconds * 1.5f : spearThrustOutSeconds;
+        float backSeconds = isCharge ? spearThrustBackSeconds * 2.0f : spearThrustBackSeconds;
 
         float elapsed = 0f;
-        while (elapsed < spearThrustOutSeconds)
+        while (elapsed < outSeconds)
         {
             elapsed += Time.unscaledDeltaTime;
-            float t = EaseOutCubic(Mathf.Clamp01(elapsed / spearThrustOutSeconds));
+            float t = EaseOutCubic(Mathf.Clamp01(elapsed / outSeconds));
             SetAttackPivotOffset(Vector3.right * (thrustDistance * t));
             attackLengthScaleOffset = thrustStretch * t;
             yield return null;
         }
 
         elapsed = 0f;
-        while (elapsed < spearThrustBackSeconds)
+        while (elapsed < backSeconds)
         {
             elapsed += Time.unscaledDeltaTime;
-            float t = EaseInOutCubic(Mathf.Clamp01(elapsed / spearThrustBackSeconds));
+            float t = EaseInOutCubic(Mathf.Clamp01(elapsed / backSeconds));
             SetAttackPivotOffset(Vector3.right * Mathf.Lerp(thrustDistance, 0f, t));
             attackLengthScaleOffset = Mathf.Lerp(thrustStretch, 0f, t);
             yield return null;
         }
     }
 
-    private IEnumerator ScissorsCutAnimation(int attackComboIndex)
+    private IEnumerator ScissorsCutAnimation(int attackComboIndex, bool isHold)
     {
         BladePose basePose = scissorsPose;
         float closeAngle = GetComboArrayValue(scissorsCloseAngleByCombo, attackComboIndex, scissorsCutCloseAngle);
         float lungeDistance = scissorsCutLungeDistance * GetComboArrayValue(scissorsLungeMultipliers, attackComboIndex, 1f);
         float closeUpperOffset = closeAngle - basePose.upperBladeAngle;
         float closeLowerOffset = -closeAngle - basePose.lowerBladeAngle;
+
+        if (isHold)
+        {
+            float holdDuration = 0.4f;
+            float elapsedHold = 0f;
+            while (elapsedHold < holdDuration)
+            {
+                elapsedHold += Time.unscaledDeltaTime;
+                // Rapidly snip the scissors
+                float tHold = Mathf.PingPong(elapsedHold * 15f, 1f);
+                attackUpperAngleOffset = closeUpperOffset * tHold * 1.5f;
+                attackLowerAngleOffset = closeLowerOffset * tHold * 1.5f;
+                SetAttackPivotOffset(Vector3.right * (lungeDistance * 2f * tHold));
+                
+                // Visually stretch the blades to emphasize the 360 AoE
+                attackLengthScaleOffset = 1.5f; 
+                yield return null;
+            }
+            yield break;
+        }
 
         float elapsed = 0f;
         while (elapsed < scissorsCutCloseSeconds)

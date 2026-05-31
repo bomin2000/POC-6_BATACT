@@ -3,7 +3,7 @@ using UnityEditor;
 
 public class KamikazeEnemySetup : MonoBehaviour
 {
-    [MenuItem("Tools/Setup Kamikaze Fast Enemy")]
+    [MenuItem("Tools/Legacy Setups/Setup Kamikaze Fast Enemy")]
     public static void SetupKamikazeEnemy()
     {
         string path = "Assets/Prefab/EnemyFast.prefab";

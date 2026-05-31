@@ -9,7 +9,7 @@ public class ProjectLayerCleanup : Editor
     private const string EnemyPrefabPath = "Assets/Prefab/Enemy.prefab";
     private const string BoomerangPrefabPath = "Assets/Prefab/DualBladeBoomerangProjectile.prefab";
 
-    [MenuItem("Tools/Cleanup Layers & Prefabs")]
+    [MenuItem("Tools/Legacy Setups/Cleanup Layers & Prefabs")]
     public static void ExecuteCleanup()
     {
         FixTagManagerLayers();

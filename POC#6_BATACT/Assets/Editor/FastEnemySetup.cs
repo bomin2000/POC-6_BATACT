@@ -3,7 +3,7 @@ using UnityEditor;
 
 public class FastEnemySetup : MonoBehaviour
 {
-    [MenuItem("Tools/Setup Fast Enemy Prefab")]
+    [MenuItem("Tools/Legacy Setups/Setup Fast Enemy Prefab")]
     public static void SetupFastEnemy()
     {
         string baseEnemyPath = "Assets/Prefab/Enemy.prefab";

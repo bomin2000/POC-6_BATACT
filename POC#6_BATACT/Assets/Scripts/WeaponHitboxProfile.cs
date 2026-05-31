@@ -19,6 +19,9 @@ public sealed class WeaponHitboxProfile : ScriptableObject
 
     [Header("Combat")]
     public HitReactionData reaction;
+    
+    [Header("Bonuses")]
+    public float healOnHit = 0f;
 }
 
 public enum HitboxShape

@@ -3,7 +3,7 @@ using UnityEditor;
 
 public class MeleeEnemySetup : MonoBehaviour
 {
-    [MenuItem("Tools/Setup Melee Enemy Refactor")]
+    [MenuItem("Tools/Legacy Setups/Setup Melee Enemy Refactor")]
     public static void SetupMeleeEnemies()
     {
         string[] prefabs = new string[] { "Assets/Prefab/Enemy.prefab" };

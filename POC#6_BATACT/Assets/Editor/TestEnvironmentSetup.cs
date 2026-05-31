@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class TestEnvironmentSetup : Editor
 {
-    [MenuItem("Tools/Create Debug Test Environment")]
+    [MenuItem("Tools/Legacy Setups/Create Debug Test Environment")]
     public static void CreateTestEnvironment()
     {
         int groundLayer = LayerMask.NameToLayer("Ground");

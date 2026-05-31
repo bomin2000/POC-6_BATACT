@@ -5,7 +5,7 @@ using UnityEngine.EventSystems;
 
 public class RestartUISetup : MonoBehaviour
 {
-    [MenuItem("Tools/Setup Game Restart UI")]
+    [MenuItem("Tools/Legacy Setups/Setup Game Restart UI")]
     public static void SetupRestartUI()
     {
         // 1. Find or create Canvas

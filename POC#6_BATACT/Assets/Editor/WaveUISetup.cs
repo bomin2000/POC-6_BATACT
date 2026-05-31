@@ -6,7 +6,7 @@ using TMPro;
 
 public class WaveUISetup : MonoBehaviour
 {
-    [MenuItem("Tools/Setup Wave Status UI")]
+    [MenuItem("Tools/Legacy Setups/Setup Wave Status UI")]
     public static void SetupWaveUI()
     {
         // 1. Find or create Canvas

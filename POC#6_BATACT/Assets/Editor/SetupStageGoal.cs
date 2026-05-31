@@ -3,7 +3,7 @@ using UnityEditor;
 
 public class SetupStageGoal : MonoBehaviour
 {
-    [MenuItem("Tools/Setup Stage Goal")]
+    [MenuItem("Tools/Legacy Setups/Setup Stage Goal")]
     public static void SetupGoal()
     {
         StageGoalTrigger existing = FindFirstObjectByType<StageGoalTrigger>();

@@ -6,7 +6,7 @@ public class WeaponLimiterSetup : Editor
 {
     private const string PlayerPrefabPath = "Assets/Prefab/Player.prefab";
 
-    [MenuItem("Tools/Setup Weapon Contact Limiter")]
+    [MenuItem("Tools/Legacy Setups/Setup Weapon Contact Limiter")]
     public static void SetupWeaponLimiter()
     {
         GameObject prefabRoot = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);

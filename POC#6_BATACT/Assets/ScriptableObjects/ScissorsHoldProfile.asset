@@ -10,20 +10,20 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c03e1e19aeb873c43b96ce5cfa8e654a, type: 3}
-  m_Name: BoomerangProFile
+  m_Name: ScissorsHoldProfile
   m_EditorClassIdentifier: Assembly-CSharp::WeaponHitboxProfile
-  state: 1
-  shape: 0
-  localOffset: {x: 0.8, y: 0}
-  boxSize: {x: 1.5, y: 1.5}
-  radius: 1.2
-  startupSeconds: 0.15
-  activeSeconds: 0.2
-  recoverySeconds: 0.1
+  state: 2
+  shape: 1
+  localOffset: {x: 0, y: 0}
+  boxSize: {x: 1.8, y: 0.45}
+  radius: 2.5
+  startupSeconds: 0.1
+  activeSeconds: 0.3
+  recoverySeconds: 0.2
   reaction:
-    reactionType: 1
-    damage: 15
-    knockbackForce: 8
-    stunSeconds: 0.1
+    reactionType: 2
+    damage: 40
+    knockbackForce: 0
+    stunSeconds: 1
     extraImpulse: {x: 0, y: 0}
-  healOnHit: 0
+  healOnHit: 15
