@@ -15,17 +15,32 @@ public class EnemyMeleeAttack : MonoBehaviour
     [SerializeField] private LayerMask playerLayers;
     [SerializeField] private string playerTag = "Player";
 
+    [Header("Visual Punch (Optional)")]
+    [SerializeField] private Transform attackVisual;
+    [SerializeField] private float windupPullback = -0.2f;
+    [SerializeField] private float punchExtension = 0.5f;
+    [SerializeField] private float visualReturnSpeed = 15f;
+    [SerializeField] private float punchStretchMultiplier = 1.5f;
+
     [Header("References")]
     [SerializeField] private EnemySideViewChaser chaser;
     [SerializeField] private Transform visualRoot;
 
     [Header("Debug Status (Read-Only)")]
     [SerializeField] private bool debugIsAttacking;
-    [SerializeField] private float debugCooldownTimer;
     [SerializeField] private float debugWindupTimer;
+    [SerializeField] private float debugCooldownTimer;
+    [SerializeField] private float debugPlayerDistance;
+    [SerializeField] private bool debugCanAttack;
+
+    public bool IsAttacking => debugIsAttacking;
+    public bool IsInAttackRange => target != null && Mathf.Abs(target.position.x - transform.position.x) <= attackRange;
 
     private Transform target;
     private float originalVisualY = -1f;
+    private Vector3 originalAttackVisualScale;
+    private Vector3 originalAttackVisualPos;
+    private Vector3 targetArmPos;
 
     private void Awake()
     {
@@ -39,6 +54,12 @@ public class EnemyMeleeAttack : MonoBehaviour
         if (visualRoot != null)
         {
             originalVisualY = Mathf.Abs(visualRoot.localScale.y);
+        }
+        if (attackVisual != null)
+        {
+            originalAttackVisualScale = attackVisual.localScale;
+            originalAttackVisualPos = attackVisual.localPosition;
+            targetArmPos = originalAttackVisualPos;
         }
     }
 
@@ -66,23 +87,40 @@ public class EnemyMeleeAttack : MonoBehaviour
                 visualRoot.localScale = scale;
             }
 
+            // Arm windup (pull back)
+            if (attackVisual != null)
+            {
+                targetArmPos = originalAttackVisualPos + new Vector3(windupPullback, 0f, 0f);
+                attackVisual.localPosition = Vector3.Lerp(attackVisual.localPosition, targetArmPos, Time.deltaTime * 15f);
+            }
+
             if (debugWindupTimer <= 0f)
             {
                 ExecuteAttack();
             }
-            return;
+        }
+        else
+        {
+            // Restore visual and arm
+            if (attackVisual != null)
+            {
+                targetArmPos = originalAttackVisualPos;
+                attackVisual.localPosition = Vector3.Lerp(attackVisual.localPosition, targetArmPos, Time.deltaTime * visualReturnSpeed);
+                attackVisual.localScale = Vector3.Lerp(attackVisual.localScale, originalAttackVisualScale, Time.deltaTime * visualReturnSpeed);
+            }
         }
 
-        if (debugCooldownTimer <= 0f)
+        if (debugIsAttacking) return;
+
+        float distanceX = Mathf.Abs(target.position.x - transform.position.x);
+        float distanceY = Mathf.Abs(target.position.y - transform.position.y);
+        
+        debugPlayerDistance = distanceX;
+        debugCanAttack = (debugCooldownTimer <= 0f && distanceX <= attackRange && distanceY <= 1.5f);
+
+        if (debugCanAttack)
         {
-            float distanceX = Mathf.Abs(target.position.x - transform.position.x);
-            // Ensure enemy is relatively on the same Y level to avoid attacking from too far above/below
-            float distanceY = Mathf.Abs(target.position.y - transform.position.y);
-            
-            if (distanceX <= attackRange && distanceY <= 1.5f)
-            {
-                StartAttack();
-            }
+            StartAttack();
         }
     }
 
@@ -126,6 +164,15 @@ public class EnemyMeleeAttack : MonoBehaviour
             Vector3 scale = visualRoot.localScale;
             scale.y = originalVisualY;
             visualRoot.localScale = scale;
+        }
+
+        // Punch arm visually
+        if (attackVisual != null)
+        {
+            attackVisual.localPosition = originalAttackVisualPos + new Vector3(punchExtension, 0f, 0f);
+            Vector3 stretchScale = originalAttackVisualScale;
+            stretchScale.x *= punchStretchMultiplier;
+            attackVisual.localScale = stretchScale;
         }
 
         int facingSign = visualRoot != null ? (int)Mathf.Sign(visualRoot.localScale.x) : 1;

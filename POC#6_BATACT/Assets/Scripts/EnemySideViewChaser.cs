@@ -8,9 +8,12 @@ public sealed class EnemySideViewChaser : MonoBehaviour
     [SerializeField] private Transform target;
     [SerializeField] private string playerTag = "Player";
 
+    [Header("Behavior")]
+    [SerializeField] private float stopDistance = 0.85f;
+    [SerializeField] private EnemyMeleeAttack meleeAttack;
+
     [Header("Movement")]
     [SerializeField] private float moveSpeed = 3.2f;
-    [SerializeField] private float stopDistance = 0.85f;
     [SerializeField] private float acceleration = 35f;
     [SerializeField] private bool ignoreEnemyToEnemyCollision = true;
 
@@ -122,6 +125,13 @@ public sealed class EnemySideViewChaser : MonoBehaviour
         if (distanceX > 0.05f)
         {
             facingSign = deltaX > 0f ? 1 : -1;
+        }
+
+        if (meleeAttack != null && (meleeAttack.IsAttacking || meleeAttack.IsInAttackRange))
+        {
+            Decelerate();
+            UpdateVisualFacing();
+            return;
         }
 
         if (distanceX <= stopDistance)
