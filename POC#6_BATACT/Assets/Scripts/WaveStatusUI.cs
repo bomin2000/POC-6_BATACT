@@ -31,14 +31,14 @@ public class WaveStatusUI : MonoBehaviour
 
         if (!spawner.HasWaves)
         {
-            waveText.text = "No Waves";
+            waveText.text = "웨이브 없음";
             return;
         }
 
         int index = spawner.CurrentWaveIndex;
         if (index >= spawner.Waves.Length)
         {
-            waveText.text = "All Waves Completed";
+            waveText.text = "모든 웨이브 완료!";
             return;
         }
 
@@ -49,13 +49,13 @@ public class WaveStatusUI : MonoBehaviour
         string state = spawner.CurrentState;
 
         // If waiting to clear, highlight it
-        if (state.Contains("cleared") || state.Contains("Delay"))
+        if (state.Contains("클리어") || state.Contains("대기"))
         {
-            waveText.text = $"<color=#FFD700>{waveName}</color>\n<size=70%>Status: {state}</size>";
+            waveText.text = $"<color=#FFD700>{waveName}</color>\n<size=70%>상태: {state}</size>";
         }
         else
         {
-            waveText.text = $"<color=#FFD700>{waveName}</color>\n<size=80%>Enemies Left: {totalRemaining}</size>\n<size=60%>{state}</size>";
+            waveText.text = $"<color=#FFD700>{waveName}</color>\n<size=80%>남은 적: {totalRemaining}</size>\n<size=60%>{state}</size>";
         }
     }
 }

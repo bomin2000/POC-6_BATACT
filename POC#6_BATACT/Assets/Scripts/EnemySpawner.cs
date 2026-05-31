@@ -95,7 +95,7 @@ public sealed class EnemySpawner : MonoBehaviour
         {
             if (waves == null || waves.Length == 0)
             {
-                debugState = "No Waves Defined";
+                debugState = "웨이브가 설정되지 않았습니다";
                 yield break;
             }
 
@@ -107,16 +107,16 @@ public sealed class EnemySpawner : MonoBehaviour
                 }
                 else
                 {
-                    debugState = "All Waves Completed";
+                    debugState = "모든 웨이브 완료!";
                     yield break;
                 }
             }
 
             EnemyWaveDefinition currentWave = waves[debugCurrentWaveIndex];
-            debugState = $"Waiting for Wave Delay ({currentWave.waveName})";
+            debugState = $"대기 중... ({currentWave.waveName})";
             yield return new WaitForSeconds(currentWave.waveDelay);
 
-            debugState = $"Spawning Wave ({currentWave.waveName})";
+            debugState = $"적 생성 중 ({currentWave.waveName})";
             
             // Prepare spawn list
             List<GameObject> enemiesToSpawn = new List<GameObject>();
@@ -147,11 +147,11 @@ public sealed class EnemySpawner : MonoBehaviour
                     {
                         break;
                     }
-                    debugState = "Waiting for Max Alive Room";
+                    debugState = "필드 적 초과, 스폰 대기 중";
                     yield return new WaitForSeconds(0.5f);
                 }
 
-                debugState = $"Spawning Wave ({currentWave.waveName})";
+                debugState = $"적 생성 중 ({currentWave.waveName})";
                 SpawnSpecificEnemy(enemiesToSpawn[i]);
                 debugEnemiesRemainingToSpawn--;
 
@@ -162,7 +162,7 @@ public sealed class EnemySpawner : MonoBehaviour
             }
 
             // Wait for all to die
-            debugState = "Waiting for enemies to be cleared";
+            debugState = "전멸을 기다리는 중...";
             while (true)
             {
                 CleanupDeadEntries();
@@ -174,7 +174,7 @@ public sealed class EnemySpawner : MonoBehaviour
                 yield return new WaitForSeconds(0.5f);
             }
 
-            debugState = "Wave Cleared! Waiting for next wave...";
+            debugState = "웨이브 클리어! 다음 웨이브 대기 중...";
             yield return new WaitForSeconds(currentWave.nextWaveDelay);
 
             debugCurrentWaveIndex++;
