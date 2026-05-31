@@ -60,6 +60,7 @@ public sealed class EnemySpawner : MonoBehaviour
     public string CurrentState => debugState;
     public EnemyWaveDefinition[] Waves => waves;
     public bool HasWaves => waves != null && waves.Length > 0;
+    public bool IsAllWavesCompleted => debugState == "All Waves Completed" || debugState == "모든 웨이브 완료!";
 
     private readonly List<PrototypeEnemyHitReceiver> aliveEnemies = new List<PrototypeEnemyHitReceiver>();
     private Coroutine spawnRoutine;
