@@ -1,16 +1,24 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 using TMPro;
 
 public class GameResultUI : MonoBehaviour
 {
+    public enum GameState { Playing, GameOver, StageClear }
+
     [SerializeField] private TextMeshProUGUI resultText;
     [SerializeField] private Image bgImage;
     [SerializeField] private PlayerHealth player;
     [SerializeField] private StageGoalTrigger goal;
-    [SerializeField] private bool stopTimeOnResult = false;
+    
+    [Header("Options")]
+    [SerializeField] private bool stopTimeOnResult = true;
+    [SerializeField] private bool blockPlayerInputOnGameOver = true;
 
-    private bool hasTriggered = false;
+    private GameState currentState = GameState.Playing;
+    private PlayerTopDownMovement playerMovement;
+    private DualBladeWeaponController weaponController;
 
     private void Awake()
     {
@@ -37,38 +45,66 @@ public class GameResultUI : MonoBehaviour
         {
             goal = FindFirstObjectByType<StageGoalTrigger>();
         }
+
+        if (player != null)
+        {
+            playerMovement = player.GetComponent<PlayerTopDownMovement>();
+            weaponController = player.GetComponent<DualBladeWeaponController>();
+        }
     }
 
     private void Update()
     {
-        if (hasTriggered || resultText == null)
+        CheckForRestartInput();
+
+        if (currentState != GameState.Playing)
         {
             return;
         }
 
-        if (goal == null)
-        {
-            goal = FindFirstObjectByType<StageGoalTrigger>();
-        }
-        if (player == null)
-        {
-            player = FindFirstObjectByType<PlayerHealth>();
-        }
-
+        // Game Over condition
         if (player != null && player.IsDead)
         {
-            TriggerResult("<color=red>GAME OVER</color>");
+            SetGameState(GameState.GameOver);
         }
+        // Clear condition
         else if (goal != null && goal.IsReached)
         {
-            TriggerResult("<color=#00FF00>STAGE CLEAR!</color>");
+            SetGameState(GameState.StageClear);
         }
     }
 
-    private void TriggerResult(string message)
+    private void SetGameState(GameState newState)
     {
-        hasTriggered = true;
-        
+        if (currentState != GameState.Playing)
+        {
+            return; // Once settled, do not allow override
+        }
+
+        currentState = newState;
+
+        if (currentState == GameState.GameOver)
+        {
+            ShowResultUI("<color=red>GAME OVER</color>");
+            if (blockPlayerInputOnGameOver && playerMovement != null)
+            {
+                playerMovement.enabled = false;
+                if (weaponController != null) weaponController.enabled = false;
+            }
+        }
+        else if (currentState == GameState.StageClear)
+        {
+            ShowResultUI("<color=#00FF00>STAGE CLEAR!</color>");
+        }
+
+        if (stopTimeOnResult)
+        {
+            Time.timeScale = 0f;
+        }
+    }
+
+    private void ShowResultUI(string message)
+    {
         if (resultText != null)
         {
             resultText.text = message;
@@ -79,16 +115,26 @@ public class GameResultUI : MonoBehaviour
         {
             bgImage.enabled = true;
         }
+    }
 
-        if (stopTimeOnResult)
+    private void CheckForRestartInput()
+    {
+        // R key restart (works even if timeScale is 0)
+        if (Input.GetKeyDown(KeyCode.R))
         {
-            Time.timeScale = 0f;
+            RestartScene();
         }
+    }
+
+    public void RestartScene()
+    {
+        Time.timeScale = 1f;
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 
     private void OnDestroy()
     {
-        if (hasTriggered && stopTimeOnResult && Time.timeScale == 0f)
+        if (currentState != GameState.Playing && stopTimeOnResult && Time.timeScale == 0f)
         {
             Time.timeScale = 1f; // Just in case UI is destroyed
         }

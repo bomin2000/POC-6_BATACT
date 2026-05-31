@@ -7,9 +7,13 @@ public sealed class PlayerHealth : MonoBehaviour
 {
     [Header("Health")]
     [SerializeField] private float maxHealth = 100f;
-    [SerializeField] private bool respawnOnDeath = true;
+    [SerializeField] private bool respawnOnDeath = false;
     [SerializeField] private float respawnDelay = 1f;
     [SerializeField] private Transform respawnPoint;
+
+    [Header("Fall Death")]
+    [SerializeField] private bool enableFallDeath = true;
+    [SerializeField] private float fallDeathHeight = -10f;
 
     [Header("Damage Response")]
     [SerializeField] private float invulnerableSeconds = 0.75f;
@@ -70,6 +74,13 @@ public sealed class PlayerHealth : MonoBehaviour
         if (invulnerableTimer > 0f)
         {
             invulnerableTimer -= Time.deltaTime;
+        }
+
+        if (enableFallDeath && !isDead && transform.position.y < fallDeathHeight)
+        {
+            CurrentHealth = 0f;
+            HealthChanged?.Invoke(CurrentHealth, maxHealth);
+            Die();
         }
     }
 
