@@ -131,6 +131,12 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
 
         if (externalControlLockTimer > 0f)
         {
+            if (catchStabilizeTimer > 0f)
+            {
+                // Actively clamp runaway physics momentum even if external lock is somehow active
+                float clampedX = Mathf.Clamp(body.linearVelocity.x, -moveSpeed * 1.2f, moveSpeed * 1.2f);
+                body.linearVelocity = new Vector2(clampedX, body.linearVelocity.y);
+            }
             ApplyBetterJumpGravity();
             return;
         }
@@ -231,6 +237,10 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
         if (catchStabilizeTimer > 0f)
         {
             targetVelocityX = 0f;
+            // Forcefully crush horizontal momentum so the player doesn't slide 
+            // and interpret the slide as a "boomerang recoil" push.
+            float dampenedX = Mathf.MoveTowards(body.linearVelocity.x, 0f, moveSpeed * 20f * Time.fixedDeltaTime);
+            body.linearVelocity = new Vector2(dampenedX, body.linearVelocity.y);
         }
 
         float control = IsGrounded ? 1f : airControlMultiplier;
@@ -336,7 +346,11 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
         catchStabilizeTimer = Mathf.Max(catchStabilizeTimer, seconds);
         dashTimer = 0f;
         dashCooldownTimer = Mathf.Max(dashCooldownTimer, 0.08f);
+        externalControlLockTimer = 0f; // Clear any errant overlap knockbacks
+        
         body.gravityScale = defaultGravityScale;
+        
+        // Kill horizontal velocity completely so the player feels a firm "catch" rather than a slide
         body.linearVelocity = new Vector2(0f, Mathf.Min(body.linearVelocity.y, jumpVelocity * 0.35f));
     }
 

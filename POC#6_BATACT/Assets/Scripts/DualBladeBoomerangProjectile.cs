@@ -32,6 +32,15 @@ public sealed class DualBladeBoomerangProjectile : MonoBehaviour
 
     public System.Action<DualBladeBoomerangProjectile> Caught;
 
+    private void Awake()
+    {
+        Collider2D[] colliders = GetComponentsInChildren<Collider2D>();
+        foreach (var col in colliders)
+        {
+            col.isTrigger = true;
+        }
+    }
+
     public void Launch(Transform ownerTransform, WeaponHitboxProfile profile, Vector2 direction)
     {
         owner = ownerTransform;
@@ -115,7 +124,7 @@ public sealed class DualBladeBoomerangProjectile : MonoBehaviour
             }
 
             IWeaponHitReceiver receiver = target.GetComponentInParent<IWeaponHitReceiver>();
-            if (receiver == null)
+            if (receiver == null || receiver.Equals(owner.GetComponent<IWeaponHitReceiver>()) || target.gameObject == owner.gameObject || target.transform.IsChildOf(owner))
             {
                 continue;
             }
