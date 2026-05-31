@@ -14,8 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WeaponHitboxProfile
   state: 0
   shape: 0
-  localOffset: {x: 1.5, y: 0}
-  boxSize: {x: 2.5, y: 0.5}
+  localOffset: {x: 4.5, y: 0}
+  boxSize: {x: 0.5, y: 0.5}
   radius: 1.5
   startupSeconds: 0.1
   activeSeconds: 0.15
