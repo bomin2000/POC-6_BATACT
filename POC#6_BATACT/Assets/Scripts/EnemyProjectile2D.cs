@@ -9,6 +9,9 @@ public class EnemyProjectile2D : MonoBehaviour
     [SerializeField] private float lifetime = 3f;
     [SerializeField] private float knockbackForce = 15f;
     
+    [Header("Visual")]
+    [SerializeField] private Transform visualRoot;
+    
     [Header("Collisions")]
     [SerializeField] private LayerMask playerLayer;
     [SerializeField] private LayerMask groundLayer;
