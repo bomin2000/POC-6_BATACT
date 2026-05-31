@@ -131,7 +131,13 @@ public sealed class EnemySideViewChaser : MonoBehaviour
             return;
         }
 
-        float desiredVelocityX = facingSign * moveSpeed + GetSeparationVelocityX();
+        float actualMoveSpeed = moveSpeed;
+        if (!hopWhenBlocked && IsBlockedAhead())
+        {
+            actualMoveSpeed = 0f; // Stop pushing into walls if we can't jump over them
+        }
+
+        float desiredVelocityX = facingSign * actualMoveSpeed + GetSeparationVelocityX();
         float nextVelocityX = Mathf.MoveTowards(body.linearVelocity.x, desiredVelocityX, acceleration * Time.fixedDeltaTime);
         body.linearVelocity = new Vector2(nextVelocityX, ClampVerticalEnemyStackVelocity(body.linearVelocity.y));
 

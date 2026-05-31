@@ -106,6 +106,7 @@ GameObject:
   - component: {fileID: 2033463836135743422}
   - component: {fileID: 3049690700899848916}
   - component: {fileID: 2394862614227179770}
+  - component: {fileID: 5152025915460643828}
   m_Layer: 3
   m_Name: Enemy
   m_TagString: Untagged
@@ -239,7 +240,7 @@ MonoBehaviour:
   target: {fileID: 0}
   playerTag: Player
   moveSpeed: 1
-  stopDistance: 0.85
+  stopDistance: 1
   acceleration: 20
   ignoreEnemyToEnemyCollision: 1
   enemyLayers:
@@ -290,7 +291,35 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 96a688d8ae4eaa545a164a36e4c8e223, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyContactDamage
-  damage: 10
-  knockbackForce: 8
+  damage: 5
+  knockbackForce: 4
   extraImpulse: {x: 0, y: 2}
   damageCooldown: 0.6
+--- !u!114 &5152025915460643828
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5576281405834939419}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 07dbe523310fd8045a314a3ee88782f4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyMeleeAttack
+  attackRange: 1.2
+  attackWindup: 0.5
+  attackCooldown: 1.5
+  damage: 15
+  knockbackForce: 10
+  attackBoxSize: {x: 1.2, y: 1}
+  attackBoxOffset: {x: 0.6, y: 0}
+  playerLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  playerTag: Player
+  chaser: {fileID: 0}
+  visualRoot: {fileID: 0}
+  debugIsAttacking: 0
+  debugCooldownTimer: 0
+  debugWindupTimer: 0
