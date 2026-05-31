@@ -120,8 +120,8 @@ public sealed class DualBladeWeaponController : MonoBehaviour
     [SerializeField] private float lastAutoAttackTime = -999f;
     [SerializeField] private bool canAutoAttack;
 
-    [Header("Optional Extensions")]
-    public WeaponTerrainContactLimiter2D contactLimiter;
+    [Header("Assist Systems")]
+    [SerializeField] private WeaponTerrainConstraint2D terrainConstraint;
 
     [Header("Combo Hit Tracking")]
     [SerializeField] private int consecutiveHitCount = 0;
@@ -252,21 +252,11 @@ public sealed class DualBladeWeaponController : MonoBehaviour
                 int aimSign = toMouse.x >= 0f ? 1 : -1;
                 aimDirection = ClampAimToFacingHemisphere(toMouse.normalized, aimSign);
                 
-                if (contactLimiter != null)
-                {
-                    aimDirection = contactLimiter.LimitAimDirection(aimDirection, CurrentState);
-                }
-                
                 ApplySideViewWeaponFacing(aimSign, aimDirection);
             }
             else
             {
                 aimDirection = toMouse.normalized;
-                
-                if (contactLimiter != null)
-                {
-                    aimDirection = contactLimiter.LimitAimDirection(aimDirection, CurrentState);
-                }
                 
                 weaponRoot.right = aimDirection;
             }
@@ -599,10 +589,13 @@ public sealed class DualBladeWeaponController : MonoBehaviour
             return;
         }
 
+        lastComboTime = Time.time;
+
         WeaponHitboxProfile actualProfile = isEmpowered && boomerangEmpoweredProfile != null ? boomerangEmpoweredProfile : boomerangProfile;
 
         activeBoomerang = Instantiate(boomerangPrefab, throwSpawnPoint.position, Quaternion.identity);
         activeBoomerang.Caught += OnBoomerangCaught;
+        activeBoomerang.OnHit += HandleHitSuccessful;
         activeBoomerang.Launch(transform, actualProfile, aimDirection);
 
         TransitionTo(WeaponState.BareHand);
@@ -616,6 +609,7 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         }
 
         activeBoomerang.Caught -= OnBoomerangCaught;
+        activeBoomerang.OnHit -= HandleHitSuccessful;
         Destroy(activeBoomerang.gameObject);
         activeBoomerang = null;
 
@@ -688,16 +682,16 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         }
 
         Vector3 targetPivot = GetPivotPosition(visibleForm) + attackPivotOffset;
-        
-        if (contactLimiter != null)
-        {
-            targetPivot = contactLimiter.LimitPivotOffset(targetPivot, visibleForm, weaponRoot);
-        }
 
         BladePose pose = GetPose(visibleForm);
         pose.upperBladeAngle += attackUpperAngleOffset;
         pose.lowerBladeAngle += attackLowerAngleOffset;
         pose.lengthScale += attackLengthScaleOffset;
+
+        if (terrainConstraint != null)
+        {
+            terrainConstraint.ApplyConstraint(ref aimDirection, ref targetPivot, ref pose.lengthScale, visibleForm);
+        }
         float t = 1f - Mathf.Exp(-snapLerpSharpness * Time.deltaTime);
 
         pivot.localPosition = Vector3.Lerp(pivot.localPosition, targetPivot, t);

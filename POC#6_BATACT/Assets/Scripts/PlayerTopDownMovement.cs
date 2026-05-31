@@ -231,6 +231,13 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
         return false;
     }
 
+    private Vector2 weaponPushDelta;
+
+    public void ApplyWeaponPushDelta(Vector2 delta)
+    {
+        weaponPushDelta += delta;
+    }
+
     private void ApplyHorizontalMovement()
     {
         float targetVelocityX = horizontalInput * moveSpeed;
@@ -246,6 +253,26 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
         float control = IsGrounded ? 1f : airControlMultiplier;
         float rate = Mathf.Abs(targetVelocityX) > 0.01f ? acceleration : deceleration;
         float nextVelocityX = Mathf.MoveTowards(body.linearVelocity.x, targetVelocityX, rate * control * Time.fixedDeltaTime);
+
+        // Apply weapon push delta to position and kill opposing velocity
+        if (weaponPushDelta.sqrMagnitude > 0f)
+        {
+            body.position += weaponPushDelta;
+
+            // Kill velocity that opposes the push direction
+            if (Vector2.Dot(body.linearVelocity, weaponPushDelta) < 0f)
+            {
+                if (Mathf.Abs(weaponPushDelta.x) > 0.01f && Mathf.Sign(body.linearVelocity.x) != Mathf.Sign(weaponPushDelta.x))
+                {
+                    nextVelocityX = 0f;
+                }
+                if (weaponPushDelta.y > 0.01f && body.linearVelocity.y < 0f)
+                {
+                    body.linearVelocity = new Vector2(body.linearVelocity.x, 0f);
+                }
+            }
+            weaponPushDelta = Vector2.zero;
+        }
 
         body.linearVelocity = new Vector2(nextVelocityX, body.linearVelocity.y);
     }

@@ -77,7 +77,7 @@ public class WeaponRoleSetup : MonoBehaviour
             {
                 profile.state = WeaponState.Spear;
                 profile.shape = HitboxShape.Box;
-                profile.localOffset = new Vector2(2.6f, 0f);
+                profile.localOffset = new Vector2(3.2f, 0f);
                 profile.boxSize = new Vector2(2.5f, 0.5f); 
                 
                 profile.startupSeconds = 0.1f;

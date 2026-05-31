@@ -32,6 +32,7 @@ public sealed class DualBladeBoomerangProjectile : MonoBehaviour
 
     public bool IsReturning => returning;
     public System.Action<DualBladeBoomerangProjectile> Caught;
+    public System.Action<Collider2D, WeaponHitboxProfile> OnHit;
 
     private void Awake()
     {
@@ -156,6 +157,16 @@ public sealed class DualBladeBoomerangProjectile : MonoBehaviour
                 target.bounds.center);
 
             receiver.ReceiveWeaponHit(hitProfile.reaction, impulse, owner.gameObject);
+            OnHit?.Invoke(target, hitProfile);
+
+            if (hitProfile.healOnHit > 0f && owner != null)
+            {
+                PlayerHealth health = owner.GetComponent<PlayerHealth>();
+                if (health != null)
+                {
+                    health.Heal(hitProfile.healOnHit);
+                }
+            }
         }
     }
 }
