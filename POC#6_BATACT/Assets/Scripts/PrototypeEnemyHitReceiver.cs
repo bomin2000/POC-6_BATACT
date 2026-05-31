@@ -55,6 +55,13 @@ public sealed class PrototypeEnemyHitReceiver : MonoBehaviour, IWeaponHitReceive
             originalLinearDamping = body.linearDamping;
         }
 
+        if (flashRenderer == null)
+        {
+            Transform visual = transform.Find("visualRoot") ?? transform.Find("body");
+            if (visual != null) flashRenderer = visual.GetComponent<SpriteRenderer>();
+            if (flashRenderer == null) flashRenderer = GetComponentInChildren<SpriteRenderer>();
+        }
+
         if (flashRenderer != null)
         {
             originalColor = flashRenderer.color;
@@ -186,14 +193,15 @@ public sealed class PrototypeEnemyHitReceiver : MonoBehaviour, IWeaponHitReceive
 
     private IEnumerator FlashRoutine()
     {
-        if (flashRenderer == null)
-        {
-            yield break;
-        }
+        if (flashRenderer == null) yield break;
 
         flashRenderer.color = hitColor;
         yield return new WaitForSeconds(0.05f);
-        flashRenderer.color = originalColor;
+        
+        if (!isDead && flashRenderer != null)
+        {
+            flashRenderer.color = originalColor;
+        }
     }
 
     private IEnumerator HitStopRoutine(float seconds)

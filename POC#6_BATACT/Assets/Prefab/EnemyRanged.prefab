@@ -169,7 +169,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 42d253b8ed2f127449a415b8a1af6827, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PrototypeEnemyHitReceiver
-  maxHealth: 50
+  maxHealth: 60
   destroyOnDeath: 1
   deathDestroyDelay: 0.05
   dieBelowY: 1
@@ -238,9 +238,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::EnemyRangedShooter
   target: {fileID: 0}
   playerTag: Player
-  moveSpeed: 0.5
-  stopDistance: 5.5
-  retreatDistance: 2.5
+  moveSpeed: 2.5
+  stopDistance: 6
+  retreatDistance: 3.5
   acceleration: 25
   projectilePrefab: {fileID: 6907261828716925171, guid: 812bc9633104b604ea1d70c59c7b56d7, type: 3}
   firePoint: {fileID: 3170466966191169889}
