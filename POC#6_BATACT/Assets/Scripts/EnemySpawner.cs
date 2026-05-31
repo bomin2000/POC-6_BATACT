@@ -6,6 +6,10 @@ public sealed class EnemySpawner : MonoBehaviour
 {
     [Header("Prefab")]
     [SerializeField] private GameObject enemyPrefab;
+    [SerializeField] private GameObject rangedEnemyPrefab;
+    [SerializeField] [Range(0f, 1f)] private float rangedSpawnChance = 0.3f;
+    [SerializeField] private GameObject fastEnemyPrefab;
+    [SerializeField] [Range(0f, 1f)] private float fastSpawnChance = 0.3f;
     [SerializeField] private Transform target;
 
     [Header("Spawn Points")]
@@ -52,14 +56,31 @@ public sealed class EnemySpawner : MonoBehaviour
             return;
         }
 
+        GameObject prefabToSpawn = enemyPrefab;
+        float roll = Random.value;
+        if (rangedEnemyPrefab != null && roll <= rangedSpawnChance)
+        {
+            prefabToSpawn = rangedEnemyPrefab;
+        }
+        else if (fastEnemyPrefab != null && roll <= rangedSpawnChance + fastSpawnChance)
+        {
+            prefabToSpawn = fastEnemyPrefab;
+        }
+
         Vector3 position = GetSpawnPosition();
-        GameObject enemyObject = Instantiate(enemyPrefab, position, Quaternion.identity);
+        GameObject enemyObject = Instantiate(prefabToSpawn, position, Quaternion.identity);
 
         EnemySideViewChaser chaser = enemyObject.GetComponent<EnemySideViewChaser>();
         if (chaser != null && target != null)
         {
             chaser.SetTarget(target);
             chaser.RefreshEnemyCollisionIgnores();
+        }
+
+        EnemyRangedShooter shooter = enemyObject.GetComponent<EnemyRangedShooter>();
+        if (shooter != null && target != null)
+        {
+            shooter.SetTarget(target);
         }
 
         PrototypeEnemyHitReceiver receiver = enemyObject.GetComponent<PrototypeEnemyHitReceiver>();

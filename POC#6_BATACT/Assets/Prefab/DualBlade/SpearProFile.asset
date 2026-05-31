@@ -22,7 +22,7 @@ MonoBehaviour:
   recoverySeconds: 0.16
   reaction:
     reactionType: 0
-    damage: 10
+    damage: 5
     knockbackForce: 14
     stunSeconds: 0.1
     extraImpulse: {x: 0, y: 0}

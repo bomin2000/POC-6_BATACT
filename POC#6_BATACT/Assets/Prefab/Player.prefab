@@ -186,7 +186,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 8
   drawGizmos: 1
-  weaponController: {fileID: 0}
+  weaponController: {fileID: 2061685801318483262}
   previewColor: {r: 1, g: 0.4, b: 0, a: 0.8}
 --- !u!1 &2448552729698543968
 GameObject:
@@ -501,6 +501,7 @@ GameObject:
   - component: {fileID: 3500458010252319854}
   - component: {fileID: 5669863747322986202}
   - component: {fileID: 2203174731317011125}
+  - component: {fileID: 8195386044662975514}
   m_Layer: 6
   m_Name: Player
   m_TagString: Untagged
@@ -586,6 +587,9 @@ MonoBehaviour:
   scissorsCutCloseSeconds: 0.07
   scissorsCutOpenSeconds: 0.13
   scissorsCutLungeDistance: 0.25
+  spearAutoAttackInterval: 0.5
+  scissorsAutoAttackInterval: 0.1
+  boomerangAutoAttackInterval: 0.6
   enableComboBuffer: 1
   comboResetSeconds: 0.7
   spearComboCount: 3
@@ -605,6 +609,8 @@ MonoBehaviour:
   scissorsCloseAngleByCombo:
   - 8
   - 0
+  lastAutoAttackTime: -999
+  canAutoAttack: 0
   contactLimiter: {fileID: 3500458010252319854}
 --- !u!50 &3951122699985674552
 Rigidbody2D:
@@ -841,6 +847,48 @@ MonoBehaviour:
   debugSelectedEscapeDirection: {x: 0, y: 0}
   debugLastBlockedReason: None
   debugLastOverlapColliderName: None
+--- !u!114 &8195386044662975514
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4615884595108132435}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7eeefa735840af940a925468f293730d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SpearTerrainMovementAssist
+  terrainProbe: {fileID: 1865068627144009398}
+  playerMovement: {fileID: 0}
+  spaceChecker: {fileID: 0}
+  isActive: 1
+  wallVelocityDamping: 0.85
+  fallVelocityDamping: 0.6
+  jumpKey: 32
+  floorVaultUpImpulse: 18
+  floorVaultSideImpulse: 12
+  wallVaultUpImpulse: 14
+  wallVaultSideImpulse: 15
+  vaultCooldown: 0.4
+  vaultControlLockSeconds: 0.15
+  minimumNormalXForWall: 0.5
+  minimumNormalYForFloor: 0.5
+  enableDebugLogging: 0
+  debugHasProbe: 0
+  debugHasRigidbody: 0
+  debugActiveState: 0
+  debugProbeIsContact: 0
+  debugContactNormal: {x: 0, y: 0}
+  debugCorrectionApplied: 0
+  debugBlockReason: 
+  debugVelocityBefore: {x: 0, y: 0}
+  debugVelocityAfter: {x: 0, y: 0}
+  debugCanVault: 0
+  debugLastVaultTime: 0
+  debugLastVaultDirection: {x: 0, y: 0}
+  debugLastVaultImpulse: {x: 0, y: 0}
+  debugVaultBlockReason: 
 --- !u!1 &5105635373414431685
 GameObject:
   m_ObjectHideFlags: 0
@@ -1016,7 +1064,7 @@ MonoBehaviour:
   terrainLayers:
     serializedVersion: 2
     m_Bits: 128
-  spearProbeLength: 1.8
+  spearProbeLength: 2.6
   spearProbeRadius: 0.15
   enableBoomerangProbe: 0
   boomerangProbeRadius: 0.5
