@@ -183,6 +183,7 @@ public class WeaponTerrainConstraint2D : MonoBehaviour
     private bool IsIgnoredCollider(Collider2D col)
     {
         if (col == null) return true;
+        if (col.isTrigger) return true; // Ignore trigger zones like EncounterTrigger or StageGoal
         if (col.transform == playerBody.transform || col.transform.IsChildOf(playerBody.transform)) return true;
         if (controller != null && controller.ContainsWeaponCollider(col)) return true;
         return false;
