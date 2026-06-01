@@ -128,13 +128,13 @@ public sealed class PlayerHealthUI : MonoBehaviour
         root.anchorMax = new Vector2(0f, 1f);
         root.pivot = new Vector2(0f, 1f);
         root.anchoredPosition = anchoredPosition;
-        root.sizeDelta = new Vector2(barSize.x, barSize.y + 26f);
+        root.sizeDelta = new Vector2(barSize.x, barSize.y + 60f);
 
         GameObject labelObject = new GameObject("HealthLabel");
         labelObject.transform.SetParent(transform, false);
         healthLabel = labelObject.AddComponent<TextMeshProUGUI>();
         healthLabel.text = $"{titleText} 100 / 100";
-        healthLabel.fontSize = 18f;
+        healthLabel.fontSize = 50f;
         healthLabel.color = labelColor;
         healthLabel.alignment = TextAlignmentOptions.Left;
 
@@ -143,7 +143,7 @@ public sealed class PlayerHealthUI : MonoBehaviour
         labelRect.anchorMax = new Vector2(1f, 1f);
         labelRect.pivot = new Vector2(0f, 1f);
         labelRect.anchoredPosition = Vector2.zero;
-        labelRect.sizeDelta = new Vector2(0f, 24f);
+        labelRect.sizeDelta = new Vector2(0f, 60f);
 
         GameObject sliderObject = new GameObject("PlayerHealthSlider");
         sliderObject.transform.SetParent(transform, false);
@@ -158,7 +158,7 @@ public sealed class PlayerHealthUI : MonoBehaviour
         sliderRect.anchorMin = new Vector2(0f, 1f);
         sliderRect.anchorMax = new Vector2(0f, 1f);
         sliderRect.pivot = new Vector2(0f, 1f);
-        sliderRect.anchoredPosition = new Vector2(0f, -26f);
+        sliderRect.anchoredPosition = new Vector2(0f, -60f);
         sliderRect.sizeDelta = barSize;
 
         GameObject backgroundObject = new GameObject("Background");

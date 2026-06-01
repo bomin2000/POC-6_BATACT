@@ -12,6 +12,7 @@ public class GameRestartUI : MonoBehaviour
     {
         if (restartButton != null)
         {
+            restartButton.gameObject.SetActive(false); // Hide the button as requested
             restartButton.onClick.AddListener(RestartGame);
         }
     }

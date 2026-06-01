@@ -85,7 +85,7 @@ public class GameResultUI : MonoBehaviour
 
         if (currentState == GameState.GameOver)
         {
-            ShowResultUI("<color=red>GAME OVER</color>");
+            ShowResultUI("<color=red>게임 오버</color>");
             if (blockPlayerInputOnGameOver && playerMovement != null)
             {
                 playerMovement.enabled = false;
@@ -94,7 +94,7 @@ public class GameResultUI : MonoBehaviour
         }
         else if (currentState == GameState.StageClear)
         {
-            ShowResultUI("<color=#00FF00>STAGE CLEAR!</color>");
+            ShowResultUI("<color=#00FF00>스테이지 클리어!</color>");
         }
 
         if (stopTimeOnResult)

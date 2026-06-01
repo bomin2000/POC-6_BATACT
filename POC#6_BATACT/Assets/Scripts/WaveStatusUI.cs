@@ -12,6 +12,11 @@ public class WaveStatusUI : MonoBehaviour
         {
             waveText = GetComponent<TextMeshProUGUI>();
         }
+        
+        if (waveText != null)
+        {
+            waveText.gameObject.SetActive(false); // Hide the wave status as requested
+        }
     }
 
     private void Start()

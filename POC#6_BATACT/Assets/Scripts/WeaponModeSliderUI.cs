@@ -21,6 +21,10 @@ public sealed class WeaponModeSliderUI : MonoBehaviour
     [SerializeField] private float sliderLerpSharpness = 18f;
 
     private float targetValue = 1f;
+    private WeaponState? previousState = null;
+    private bool spearHintShown = false;
+    private bool boomerangHintShown = false;
+    private bool scissorsHintShown = false;
 
     private void Awake()
     {
@@ -50,6 +54,16 @@ public sealed class WeaponModeSliderUI : MonoBehaviour
         }
 
         WeaponState state = weaponController.CurrentState;
+        
+        if (previousState != state)
+        {
+            if (previousState.HasValue && TutorialHintUI.Instance != null)
+            {
+                ShowWeaponHint(state);
+            }
+            previousState = state;
+        }
+
         targetValue = GetSliderValue(state);
 
         float t = 1f - Mathf.Exp(-sliderLerpSharpness * Time.unscaledDeltaTime);
@@ -87,15 +101,15 @@ public sealed class WeaponModeSliderUI : MonoBehaviour
         switch (state)
         {
             case WeaponState.Spear:
-                return "SPEAR";
+                return "창";
             case WeaponState.Boomerang:
-                return "BOOMERANG";
+                return "부메랑";
             case WeaponState.Scissors:
-                return "SCISSORS";
+                return "가위";
             case WeaponState.BareHand:
-                return "BARE HAND";
+                return "맨손";
             default:
-                return state.ToString().ToUpperInvariant();
+                return state.ToString();
         }
     }
 
@@ -113,6 +127,40 @@ public sealed class WeaponModeSliderUI : MonoBehaviour
                 return bareHandColor;
             default:
                 return Color.white;
+        }
+    }
+
+    private void ShowWeaponHint(WeaponState state)
+    {
+        string hint = "";
+        switch (state)
+        {
+            case WeaponState.Spear:
+                if (!spearHintShown)
+                {
+                    hint = "창은 긴 사거리와 밀어내기에 강합니다.\n벽에 닿으면 이동이 제한됩니다.";
+                    spearHintShown = true;
+                }
+                break;
+            case WeaponState.Boomerang:
+                if (!boomerangHintShown)
+                {
+                    hint = "부메랑은 적을 끌어오고, Anchor에 걸어 이동할 수 있습니다.";
+                    boomerangHintShown = true;
+                }
+                break;
+            case WeaponState.Scissors:
+                if (!scissorsHintShown)
+                {
+                    hint = "가위는 근거리와 적 부위파괴에 강합니다.\n벽에서 공격을 누르면 천천히 내려옵니다.";
+                    scissorsHintShown = true;
+                }
+                break;
+        }
+
+        if (!string.IsNullOrEmpty(hint))
+        {
+            TutorialHintUI.Instance.ShowHint(hint, 4f);
         }
     }
 }

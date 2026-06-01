@@ -248,14 +248,14 @@ public sealed class DualBladeWeaponController : MonoBehaviour
 
         if (consecutiveHitCount >= requiredHitsForSecondary)
         {
-            comboTextMesh.text = "SKILL READY!";
+            comboTextMesh.text = "스킬 준비 완료!";
             comboTextMesh.color = Color.Lerp(Color.yellow, Color.red, Mathf.PingPong(Time.time * 10f, 1f));
             float scale = 1f + Mathf.PingPong(Time.time * 5f, 0.2f);
             comboTextMesh.transform.localScale = new Vector3(scale, scale, 1f);
         }
         else
         {
-            comboTextMesh.text = $"Hit {consecutiveHitCount}!";
+            comboTextMesh.text = $"{consecutiveHitCount} 연타!";
             comboTextMesh.color = Color.white;
             comboTextMesh.transform.localScale = Vector3.one;
         }
@@ -457,14 +457,22 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         if (Time.time >= lastAutoAttackTime + currentInterval)
         {
             lastAutoAttackTime = Time.time;
-            FirePrimaryAttack();
+            if (consecutiveHitCount >= requiredHitsForSecondary)
+            {
+                consecutiveHitCount = 0;
+                FireSecondaryAttack();
+            }
+            else
+            {
+                FirePrimaryAttack();
+            }
         }
     }
 
     private void ReadAttackInput()
     {
         bool isKeyDown = Input.GetKeyDown(attackKey);
-        bool isRightClick = Input.GetKeyDown(KeyCode.Mouse1); // Explicitly Right Click for Combos & Rope Launch
+        bool isRightClick = Input.GetKeyDown(KeyCode.Mouse1) || Input.GetKeyDown(boomerangSelectKey);
         bool isKeyHeld = Input.GetKey(attackKey); 
 
         if (CurrentState == WeaponState.BareHand)
@@ -531,7 +539,15 @@ public sealed class DualBladeWeaponController : MonoBehaviour
                 lastAutoAttackTime = Time.time;
             }
             
-            FirePrimaryAttack();
+            if (consecutiveHitCount >= requiredHitsForSecondary)
+            {
+                consecutiveHitCount = 0;
+                FireSecondaryAttack();
+            }
+            else
+            {
+                FirePrimaryAttack();
+            }
         }
     }
 
