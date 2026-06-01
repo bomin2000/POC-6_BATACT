@@ -13,23 +13,50 @@ public class TutorialHintTrigger2D : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D collision)
     {
-        if (hasTriggered && isOneShot)
-        {
-            return;
-        }
-
-        if (collision.CompareTag(targetTag))
+        if (IsPlayer(collision))
         {
             if (TutorialHintUI.Instance != null)
             {
-                TutorialHintUI.Instance.ShowHint(hintText, duration);
+                Debug.Log($"[TutorialTrigger] Entered zone. Showing hint: {hintText}");
+                TutorialHintUI.Instance.ShowTutorialHint(hintText);
             }
-            else
-            {
-                Debug.LogWarning("TutorialHintTrigger2D: TutorialHintUI.Instance is null. Cannot show hint.");
-            }
-            
-            hasTriggered = true;
         }
+    }
+
+    private void OnTriggerStay2D(Collider2D collision)
+    {
+        if (IsPlayer(collision))
+        {
+            if (TutorialHintUI.Instance != null)
+            {
+                TutorialHintUI.Instance.ShowTutorialHint(hintText);
+            }
+        }
+    }
+
+    private void OnTriggerExit2D(Collider2D collision)
+    {
+        if (IsPlayer(collision))
+        {
+            if (TutorialHintUI.Instance != null)
+            {
+                Debug.Log($"[TutorialTrigger] Exited zone. Hiding hint: {hintText}");
+                TutorialHintUI.Instance.HideTutorialHint(hintText);
+            }
+
+            if (isOneShot)
+            {
+                GetComponent<Collider2D>().enabled = false;
+            }
+        }
+    }
+
+    private bool IsPlayer(Collider2D collision)
+    {
+        // Tag check is fastest, but fallback to component check if tag is missing
+        if (collision.CompareTag(targetTag)) return true;
+        if (collision.GetComponent<PlayerHealth>() != null) return true;
+        if (collision.GetComponent<PlayerTopDownMovement>() != null) return true;
+        return false;
     }
 }

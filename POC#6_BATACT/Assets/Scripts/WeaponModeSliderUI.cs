@@ -21,10 +21,8 @@ public sealed class WeaponModeSliderUI : MonoBehaviour
     [SerializeField] private float sliderLerpSharpness = 18f;
 
     private float targetValue = 1f;
-    private WeaponState? previousState = null;
-    private bool spearHintShown = false;
-    private bool boomerangHintShown = false;
-    private bool scissorsHintShown = false;
+    private WeaponState previousState = WeaponState.BareHand;
+    private System.Collections.Generic.Dictionary<WeaponState, int> hintShowCounts = new System.Collections.Generic.Dictionary<WeaponState, int>();
 
     private void Awake()
     {
@@ -57,7 +55,7 @@ public sealed class WeaponModeSliderUI : MonoBehaviour
         
         if (previousState != state)
         {
-            if (previousState.HasValue && TutorialHintUI.Instance != null)
+            if (TutorialHintUI.Instance != null)
             {
                 ShowWeaponHint(state);
             }
@@ -130,37 +128,35 @@ public sealed class WeaponModeSliderUI : MonoBehaviour
         }
     }
 
-    private void ShowWeaponHint(WeaponState state)
+    private void ShowWeaponHint(WeaponState newState)
     {
         string hint = "";
-        switch (state)
+        
+        if (!hintShowCounts.ContainsKey(newState))
         {
-            case WeaponState.Spear:
-                if (!spearHintShown)
-                {
-                    hint = "창은 긴 사거리와 밀어내기에 강합니다.\n벽에 닿으면 이동이 제한됩니다.";
-                    spearHintShown = true;
-                }
-                break;
-            case WeaponState.Boomerang:
-                if (!boomerangHintShown)
-                {
-                    hint = "부메랑은 적을 끌어오고, Anchor에 걸어 이동할 수 있습니다.";
-                    boomerangHintShown = true;
-                }
-                break;
-            case WeaponState.Scissors:
-                if (!scissorsHintShown)
-                {
+            hintShowCounts[newState] = 0;
+        }
+        
+        if (hintShowCounts[newState] < 2)
+        {
+            switch (newState)
+            {
+                case WeaponState.Spear:
+                    hint = "창은 리치가 길며 공격속도가 느립니다.\n점프 중 벽을 향해 좌클릭시 장대점프가 가능합니다.";
+                    break;
+                case WeaponState.Boomerang:
+                    hint = "부메랑은 중거리 투척 무기입니다.\n우클릭 시 부메랑 위치로 로프를 타고 날아갑니다.";
+                    break;
+                case WeaponState.Scissors:
                     hint = "가위는 근거리와 적 부위파괴에 강합니다.\n벽에서 공격을 누르면 천천히 내려옵니다.";
-                    scissorsHintShown = true;
-                }
-                break;
+                    break;
+            }
+            hintShowCounts[newState]++;
         }
 
-        if (!string.IsNullOrEmpty(hint))
+        if (TutorialHintUI.Instance != null)
         {
-            TutorialHintUI.Instance.ShowHint(hint, 4f);
+            TutorialHintUI.Instance.ShowWeaponHint(hint);
         }
     }
 }

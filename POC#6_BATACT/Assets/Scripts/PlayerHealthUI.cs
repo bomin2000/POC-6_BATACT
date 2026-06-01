@@ -14,6 +14,8 @@ public sealed class PlayerHealthUI : MonoBehaviour
     [SerializeField] private Vector2 anchoredPosition = new Vector2(32f, -32f);
     [SerializeField] private Vector2 barSize = new Vector2(280f, 22f);
     [SerializeField] private string titleText = "HP";
+    [SerializeField] private float labelFontSize = 50f;
+    [SerializeField] private float labelHeight = 60f;
 
     [Header("Colors")]
     [SerializeField] private Color backgroundColor = new Color(0.08f, 0.08f, 0.08f, 0.85f);
@@ -128,13 +130,13 @@ public sealed class PlayerHealthUI : MonoBehaviour
         root.anchorMax = new Vector2(0f, 1f);
         root.pivot = new Vector2(0f, 1f);
         root.anchoredPosition = anchoredPosition;
-        root.sizeDelta = new Vector2(barSize.x, barSize.y + 60f);
+        root.sizeDelta = new Vector2(barSize.x, barSize.y + labelHeight);
 
         GameObject labelObject = new GameObject("HealthLabel");
         labelObject.transform.SetParent(transform, false);
         healthLabel = labelObject.AddComponent<TextMeshProUGUI>();
         healthLabel.text = $"{titleText} 100 / 100";
-        healthLabel.fontSize = 50f;
+        healthLabel.fontSize = labelFontSize;
         healthLabel.color = labelColor;
         healthLabel.alignment = TextAlignmentOptions.Left;
 
@@ -143,7 +145,7 @@ public sealed class PlayerHealthUI : MonoBehaviour
         labelRect.anchorMax = new Vector2(1f, 1f);
         labelRect.pivot = new Vector2(0f, 1f);
         labelRect.anchoredPosition = Vector2.zero;
-        labelRect.sizeDelta = new Vector2(0f, 60f);
+        labelRect.sizeDelta = new Vector2(0f, labelHeight);
 
         GameObject sliderObject = new GameObject("PlayerHealthSlider");
         sliderObject.transform.SetParent(transform, false);
@@ -158,7 +160,7 @@ public sealed class PlayerHealthUI : MonoBehaviour
         sliderRect.anchorMin = new Vector2(0f, 1f);
         sliderRect.anchorMax = new Vector2(0f, 1f);
         sliderRect.pivot = new Vector2(0f, 1f);
-        sliderRect.anchoredPosition = new Vector2(0f, -60f);
+        sliderRect.anchoredPosition = new Vector2(0f, -labelHeight);
         sliderRect.sizeDelta = barSize;
 
         GameObject backgroundObject = new GameObject("Background");

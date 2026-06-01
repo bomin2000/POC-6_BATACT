@@ -8,9 +8,22 @@ public class TutorialHintUI : MonoBehaviour
     public static TutorialHintUI Instance { get; private set; }
 
     private TextMeshProUGUI controlsText;
-    private TextMeshProUGUI hintText;
-    private CanvasGroup hintCanvasGroup;
-    private Coroutine hintCoroutine;
+    private TextMeshProUGUI tutorialHintText;
+    private CanvasGroup tutorialHintCanvasGroup;
+    
+    private TextMeshProUGUI weaponHintText;
+    private CanvasGroup weaponHintCanvasGroup;
+    
+    private string currentWeaponHint = "";
+    private bool showWeaponHint = true;
+    
+    private string currentTutorialHint = "";
+    private float tutorialHintTimer = 0f;
+
+    [Header("Controls UI Settings")]
+    [SerializeField] private Vector2 controlsPosition = new Vector2(-10f, -20f);
+    [SerializeField] private Vector2 controlsSize = new Vector2(250f, 200f);
+    [SerializeField] private float controlsFontSize = 26f;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Initialize()
@@ -57,13 +70,13 @@ public class TutorialHintUI : MonoBehaviour
         controlsRect.anchorMin = new Vector2(1, 1); // Top Right
         controlsRect.anchorMax = new Vector2(1, 1);
         controlsRect.pivot = new Vector2(1, 1);
-        controlsRect.anchoredPosition = new Vector2(-10, -20);
-        controlsRect.sizeDelta = new Vector2(250, 200);
+        controlsRect.anchoredPosition = controlsPosition;
+        controlsRect.sizeDelta = controlsSize;
 
-        controlsText.fontSize = 26;
+        controlsText.fontSize = controlsFontSize;
         controlsText.color = new Color(1, 1, 1, 0.8f);
         controlsText.alignment = TextAlignmentOptions.TopLeft;
-        controlsText.text = "<b><size=120%>조작 방법</size></b>\n<size=80%>이동:</size> W/A/S/D\n<size=80%>점프:</size> Space\n<size=80%>대시:</size> Shift\n<size=80%>기본 공격:</size> 좌클릭\n<size=80%>연계 스킬:</size> 우클릭\n<size=80%>무기 변환:</size> 마우스 휠";
+        controlsText.text = "<b><size=120%>조작 방법</size></b>\n<size=80%>이동:</size> W/A/S/D\n<size=80%>점프:</size> Space\n<size=80%>대시:</size> Shift\n<size=80%>기본 공격:</size> 좌클릭\n<size=80%>연계 스킬:</size> 우클릭\n<size=80%>무기 변환:</size> 마우스 휠\n<size=80%>무기 설명 On/Off:</size> Tab";
         controlsText.enableWordWrapping = false;
         
         // Add outline to make it readable
@@ -71,66 +84,105 @@ public class TutorialHintUI : MonoBehaviour
         controlsText.outlineWidth = 0.2f;
         controlsText.outlineColor = Color.black;
 
-        // 3. Setup Hint Text (Bottom Center)
-        GameObject hintObj = new GameObject("HintText");
-        hintObj.transform.SetParent(transform, false);
-        hintCanvasGroup = hintObj.AddComponent<CanvasGroup>();
-        hintCanvasGroup.alpha = 0f; // Hidden by default
+        // 3. Setup Tutorial Hint Text (Bottom Center)
+        GameObject tutHintObj = new GameObject("TutorialHintText");
+        tutHintObj.transform.SetParent(transform, false);
+        tutorialHintCanvasGroup = tutHintObj.AddComponent<CanvasGroup>();
+        tutorialHintCanvasGroup.alpha = 0f;
 
-        hintText = hintObj.AddComponent<TextMeshProUGUI>();
+        tutorialHintText = tutHintObj.AddComponent<TextMeshProUGUI>();
         
-        RectTransform hintRect = hintText.rectTransform;
-        hintRect.anchorMin = new Vector2(0.5f, 0.2f); // Bottom center
-        hintRect.anchorMax = new Vector2(0.5f, 0.2f);
-        hintRect.pivot = new Vector2(0.5f, 0.5f);
-        hintRect.anchoredPosition = new Vector2(0, 0);
-        hintRect.sizeDelta = new Vector2(1200, 200);
+        RectTransform tutHintRect = tutorialHintText.rectTransform;
+        tutHintRect.anchorMin = new Vector2(0.5f, 0.2f);
+        tutHintRect.anchorMax = new Vector2(0.5f, 0.2f);
+        tutHintRect.pivot = new Vector2(0.5f, 0.5f);
+        tutHintRect.anchoredPosition = new Vector2(0, 0);
+        tutHintRect.sizeDelta = new Vector2(1200, 200);
 
-        hintText.fontSize = 42;
-        hintText.color = Color.yellow;
-        hintText.alignment = TextAlignmentOptions.Center;
-        hintText.text = "";
+        tutorialHintText.fontSize = 42;
+        tutorialHintText.color = Color.yellow;
+        tutorialHintText.alignment = TextAlignmentOptions.Center;
+        tutorialHintText.text = "";
         
-        hintText.fontMaterial.EnableKeyword("OUTLINE_ON");
-        hintText.outlineWidth = 0.2f;
-        hintText.outlineColor = Color.black;
+        tutorialHintText.fontMaterial.EnableKeyword("OUTLINE_ON");
+        tutorialHintText.outlineWidth = 0.2f;
+        tutorialHintText.outlineColor = Color.black;
+
+        // 4. Setup Weapon Hint Text (Lower than Tutorial Hint)
+        GameObject wepHintObj = new GameObject("WeaponHintText");
+        wepHintObj.transform.SetParent(transform, false);
+        weaponHintCanvasGroup = wepHintObj.AddComponent<CanvasGroup>();
+        weaponHintCanvasGroup.alpha = 0f;
+
+        weaponHintText = wepHintObj.AddComponent<TextMeshProUGUI>();
+        
+        RectTransform wepHintRect = weaponHintText.rectTransform;
+        wepHintRect.anchorMin = new Vector2(0.5f, 0.2f);
+        wepHintRect.anchorMax = new Vector2(0.5f, 0.2f);
+        wepHintRect.pivot = new Vector2(0.5f, 0.5f);
+        wepHintRect.anchoredPosition = new Vector2(0, -100); // 100 lower
+        wepHintRect.sizeDelta = new Vector2(1200, 200);
+
+        weaponHintText.fontSize = 30; // Font size 30
+        weaponHintText.color = new Color(0.9f, 0.9f, 1f, 1f); // Slightly blueish white
+        weaponHintText.alignment = TextAlignmentOptions.Center;
+        weaponHintText.text = "";
+        
+        weaponHintText.fontMaterial.EnableKeyword("OUTLINE_ON");
+        weaponHintText.outlineWidth = 0.2f;
+        weaponHintText.outlineColor = Color.black;
     }
 
-    public void ShowHint(string text, float duration = 4f)
+    private void Update()
     {
-        if (hintCoroutine != null)
+        if (Input.GetKeyDown(KeyCode.Tab))
         {
-            StopCoroutine(hintCoroutine);
+            showWeaponHint = !showWeaponHint;
         }
-        
-        hintText.text = text;
-        hintCoroutine = StartCoroutine(HintRoutine(duration));
+
+        UpdateHintDisplay();
     }
 
-    private IEnumerator HintRoutine(float duration)
+    private void UpdateHintDisplay()
     {
-        // Fade in
-        float elapsed = 0f;
-        while (elapsed < 0.2f)
+        // 1. Tutorial Hint
+        if (!string.IsNullOrEmpty(currentTutorialHint))
         {
-            elapsed += Time.unscaledDeltaTime;
-            hintCanvasGroup.alpha = Mathf.Clamp01(elapsed / 0.2f);
-            yield return null;
+            tutorialHintText.text = currentTutorialHint;
+            tutorialHintCanvasGroup.alpha = Mathf.MoveTowards(tutorialHintCanvasGroup.alpha, 1f, Time.unscaledDeltaTime * 5f);
         }
-        hintCanvasGroup.alpha = 1f;
-
-        // Wait
-        yield return new WaitForSecondsRealtime(duration);
-
-        // Fade out
-        elapsed = 0f;
-        while (elapsed < 0.5f)
+        else
         {
-            elapsed += Time.unscaledDeltaTime;
-            hintCanvasGroup.alpha = 1f - Mathf.Clamp01(elapsed / 0.5f);
-            yield return null;
+            tutorialHintCanvasGroup.alpha = Mathf.MoveTowards(tutorialHintCanvasGroup.alpha, 0f, Time.unscaledDeltaTime * 5f);
         }
-        hintCanvasGroup.alpha = 0f;
-        hintCoroutine = null;
+
+        // 2. Weapon Hint
+        if (showWeaponHint && !string.IsNullOrEmpty(currentWeaponHint))
+        {
+            weaponHintText.text = currentWeaponHint;
+            weaponHintCanvasGroup.alpha = Mathf.MoveTowards(weaponHintCanvasGroup.alpha, 1f, Time.unscaledDeltaTime * 5f);
+        }
+        else
+        {
+            weaponHintCanvasGroup.alpha = Mathf.MoveTowards(weaponHintCanvasGroup.alpha, 0f, Time.unscaledDeltaTime * 5f);
+        }
+    }
+
+    public void ShowTutorialHint(string text)
+    {
+        currentTutorialHint = text;
+    }
+
+    public void HideTutorialHint(string text)
+    {
+        if (currentTutorialHint == text)
+        {
+            currentTutorialHint = "";
+        }
+    }
+
+    public void ShowWeaponHint(string text)
+    {
+        currentWeaponHint = text;
     }
 }
