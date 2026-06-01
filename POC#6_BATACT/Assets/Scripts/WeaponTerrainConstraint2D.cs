@@ -9,19 +9,21 @@ public class WeaponTerrainConstraint2D : MonoBehaviour
     public float scissorsRadius = 0.5f;
     public float probeRadius = 0.2f;
 
-    [Header("Push Limits")]
-    public float maxPushDelta = 0.5f; 
-
     [Header("Pole Vault")]
     public KeyCode jumpKey = KeyCode.Space;
-    public float floorVaultUpImpulse = 18f;
-    public float wallVaultSideImpulse = 15f;
-    public float wallVaultUpImpulse = 14f;
+    public float poleVaultUpImpulse = 18f;
+    public float poleVaultForwardImpulse = 5f;
     public float vaultCooldown = 0.4f;
+
+    [Header("Angle & Lift Settings")]
+    public float plantAngleThreshold = 25f; // within 25 degrees of vertical (straight down)
+    public float smoothLiftSpeed = 10f; // Speed for smooth damp/lerp
 
     private float vaultTimer;
     private bool isSpearPlanted;
-    private Vector2 lastPlantNormal;
+    private bool isVerticalPoleState;
+    private Vector2 plantWorldPosition;
+    private float targetLiftY;
 
     private Rigidbody2D playerBody;
     private Collider2D playerCollider;
@@ -40,13 +42,38 @@ public class WeaponTerrainConstraint2D : MonoBehaviour
     {
         if (vaultTimer > 0f) vaultTimer -= Time.deltaTime;
 
-        if (isSpearPlanted && vaultTimer <= 0f && Input.GetKeyDown(jumpKey))
+        if (controller != null && controller.CurrentState != WeaponState.Spear)
+        {
+            ResetStates();
+            return;
+        }
+
+        if (isVerticalPoleState && vaultTimer <= 0f && Input.GetKeyDown(jumpKey))
         {
             TryVault();
         }
-        
-        // Reset plant status each frame; it will be set again if constrained
-        isSpearPlanted = false;
+    }
+
+    private void FixedUpdate()
+    {
+        if (controller == null || controller.CurrentState != WeaponState.Spear || playerBody == null)
+        {
+            return;
+        }
+
+        if (isVerticalPoleState)
+        {
+            Vector2 pos = playerBody.position;
+            // Smoothly lift the player to targetLiftY over ~0.1-0.2 seconds
+            float currentY = Mathf.Lerp(pos.y, targetLiftY, smoothLiftSpeed * Time.fixedDeltaTime);
+            playerBody.position = new Vector2(pos.x, currentY);
+
+            // Prevent falling while in pole pose
+            if (playerBody.linearVelocity.y < 0f)
+            {
+                playerBody.linearVelocity = new Vector2(playerBody.linearVelocity.x, 0f);
+            }
+        }
     }
 
     private void TryVault()
@@ -54,25 +81,24 @@ public class WeaponTerrainConstraint2D : MonoBehaviour
         if (playerMovement == null) return;
 
         vaultTimer = vaultCooldown;
-        Vector2 impulse = Vector2.zero;
-
-        if (lastPlantNormal.y > 0.5f) // Floor Vault
-        {
-            impulse = new Vector2(0f, floorVaultUpImpulse);
-        }
-        else // Wall Vault
-        {
-            float awayFromWallSign = Mathf.Sign(lastPlantNormal.x);
-            impulse = new Vector2(awayFromWallSign * wallVaultSideImpulse, wallVaultUpImpulse);
-        }
+        // Strong upward force + slight forward force based on player facing
+        int facing = playerMovement.FacingSign;
+        Vector2 impulse = new Vector2(facing * poleVaultForwardImpulse, poleVaultUpImpulse);
 
         playerMovement.ApplyExternalKnockback(impulse, 0.25f);
+        ResetStates();
     }
 
-    /// <summary>
-    /// Checks for penetration. If penetration occurs, attempts to push the player.
-    /// If push is not enough/blocked, it returns true to indicate the weapon should be visually blocked.
-    /// </summary>
+    public void ResetStates()
+    {
+        isSpearPlanted = false;
+        isVerticalPoleState = false;
+        if (playerMovement != null)
+        {
+            playerMovement.SetMovementRestrictions(false, false);
+        }
+    }
+
     public bool ApplyConstraint(ref Vector2 aimDirection, ref Vector3 pivotOffset, ref float lengthScale, WeaponState state)
     {
         if (!enableConstraints || playerBody == null)
@@ -88,60 +114,70 @@ public class WeaponTerrainConstraint2D : MonoBehaviour
 
             RaycastHit2D hit = Physics2D.CircleCast(origin, probeRadius, aimDirection, targetLength, terrainLayers);
             
+            bool restrictLeft = false;
+            bool restrictRight = false;
+
             if (hit.collider != null && !IsIgnoredCollider(hit.collider))
             {
+                // Slide weapon backwards by overlap so it doesn't penetrate visually
                 float overlap = targetLength - hit.distance;
-
-                // Instead of violently pushing the player instantly when swiping down,
-                // we limit the vertical push velocity, or we reduce lengthScale if overlap is too big.
-                // If it's a floor and overlap is large, it means the player just swiped down.
-                // We only want to lift the player smoothly.
-                
-                Vector2 pushDelta = hit.normal * overlap;
-
-                // Restrict how much we can be pushed in one frame to prevent teleportation
-                if (pushDelta.magnitude > maxPushDelta)
+                if (overlap > 0)
                 {
-                    // If the push is too large (like a sudden mouse swipe), we block the weapon visually
-                    // instead of teleporting the player.
-                    pushDelta = pushDelta.normalized * maxPushDelta;
-                    // Shrink the spear visually to hide the remaining penetration
-                    lengthScale = Mathf.Max(0f, (hit.distance + maxPushDelta) / spearLength);
-                    isBlocked = true;
+                    pivotOffset -= (Vector3)(aimDirection * overlap);
                 }
 
-                if (CanMovePlayer(pushDelta))
+                if (Mathf.Abs(hit.normal.x) > 0.5f)
                 {
-                    if (playerMovement != null) playerMovement.ApplyWeaponPushDelta(pushDelta);
-                    else playerBody.position += pushDelta;
-
-                    isSpearPlanted = true;
-                    lastPlantNormal = hit.normal;
-                }
-                else
-                {
-                    if (targetLength > 0.01f)
-                    {
-                        lengthScale = Mathf.Max(0f, hit.distance / spearLength);
-                    }
+                    // Hit a wall
                     isBlocked = true;
-
-                    // If the aim is restricted by the floor, it's also planted
-                    if (hit.normal.y > 0.5f)
+                    if (hit.normal.x > 0f) restrictLeft = true;
+                    else restrictRight = true;
+                    
+                    isVerticalPoleState = false;
+                }
+                else if (hit.normal.y > 0.7f) // Ground hit
+                {
+                    if (!isSpearPlanted)
                     {
                         isSpearPlanted = true;
-                        lastPlantNormal = hit.normal;
+                        plantWorldPosition = hit.point;
+                    }
+
+                    // Check for vertical pole pose
+                    float angleToVertical = Vector2.Angle(aimDirection, Vector2.down);
+                    if (angleToVertical <= plantAngleThreshold)
+                    {
+                        isVerticalPoleState = true;
+                        
+                        // Calculate exact Y to lift player so spear perfectly touches ground
+                        float pivotWorldOffsetY = transform.TransformPoint(pivotOffset).y - playerBody.position.y;
+                        targetLiftY = plantWorldPosition.y - aimDirection.y * targetLength - pivotWorldOffsetY - 0.05f;
+                    }
+                    else
+                    {
+                        isVerticalPoleState = false;
                     }
                 }
+            }
+            else
+            {
+                isSpearPlanted = false;
+                isVerticalPoleState = false;
+            }
+
+            if (playerMovement != null)
+            {
+                playerMovement.SetMovementRestrictions(restrictLeft, restrictRight);
             }
         }
         else if (state == WeaponState.Scissors)
         {
+            ResetStates();
+
             Vector3 worldPivot = transform.TransformPoint(pivotOffset);
             Collider2D col = Physics2D.OverlapCircle(worldPivot, scissorsRadius, terrainLayers);
             if (col != null && !IsIgnoredCollider(col))
             {
-                // Scissors shouldn't push the player (no pole vaulting), just block the weapon movement
                 Vector2 closest = col.ClosestPoint(worldPivot);
                 float dist = Vector2.Distance(worldPivot, closest);
                 float overlap = scissorsRadius - dist;
@@ -149,41 +185,22 @@ public class WeaponTerrainConstraint2D : MonoBehaviour
                 if (overlap > 0)
                 {
                     isBlocked = true;
-                    // Reduce pivot offset distance to prevent visual penetration
                     pivotOffset = pivotOffset.normalized * Mathf.Max(0, pivotOffset.magnitude - overlap);
                 }
             }
+        }
+        else
+        {
+            ResetStates();
         }
 
         return isBlocked;
     }
 
-    private bool CanMovePlayer(Vector2 delta)
-    {
-        if (delta.sqrMagnitude < 0.0001f) return true;
-        
-        // Clamp large deltas
-        if (delta.magnitude > maxPushDelta)
-        {
-            delta = delta.normalized * maxPushDelta;
-        }
-
-        // Simple check: sweep the player collider
-        if (playerCollider != null)
-        {
-            int hitCount = playerCollider.Cast(delta.normalized, new ContactFilter2D { layerMask = terrainLayers, useLayerMask = true }, new RaycastHit2D[1], delta.magnitude);
-            if (hitCount > 0)
-            {
-                return false; // Path is blocked
-            }
-        }
-        return true;
-    }
-
     private bool IsIgnoredCollider(Collider2D col)
     {
         if (col == null) return true;
-        if (col.isTrigger) return true; // Ignore trigger zones like EncounterTrigger or StageGoal
+        if (col.isTrigger) return true;
         if (col.transform == playerBody.transform || col.transform.IsChildOf(playerBody.transform)) return true;
         if (controller != null && controller.ContainsWeaponCollider(col)) return true;
         return false;

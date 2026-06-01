@@ -547,12 +547,13 @@ public sealed class DualBladeWeaponController : MonoBehaviour
 
     private Vector2 GetAttackAnimationWorldOffset()
     {
+        Vector3 totalOffset = attackPivotOffset + constraintPivotOffset;
         if (weaponRoot == null)
         {
-            return attackPivotOffset;
+            return totalOffset;
         }
 
-        return weaponRoot.TransformVector(attackPivotOffset);
+        return weaponRoot.TransformVector(totalOffset);
     }
 
     private void PlayMeleeVisualAnimation(WeaponState attackState, int attackComboIndex, WeaponHitboxProfile profile)
@@ -632,6 +633,11 @@ public sealed class DualBladeWeaponController : MonoBehaviour
             meleeAnimationRoutine = null;
         }
 
+        if (terrainConstraint != null)
+        {
+            terrainConstraint.ResetStates();
+        }
+
         ClearAttackOffsets();
         hasBufferedAttack = false;
         comboState = nextState;
@@ -674,6 +680,8 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         }
     }
 
+    private Vector3 constraintPivotOffset;
+
     private void SmoothSnapVisibleForm()
     {
         if (CurrentState == WeaponState.BareHand || pivot == null)
@@ -682,6 +690,7 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         }
 
         Vector3 targetPivot = GetPivotPosition(visibleForm) + attackPivotOffset;
+        Vector3 originalTargetPivot = targetPivot;
 
         BladePose pose = GetPose(visibleForm);
         pose.upperBladeAngle += attackUpperAngleOffset;
@@ -692,6 +701,9 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         {
             terrainConstraint.ApplyConstraint(ref aimDirection, ref targetPivot, ref pose.lengthScale, visibleForm);
         }
+        
+        constraintPivotOffset = targetPivot - originalTargetPivot;
+        
         float t = 1f - Mathf.Exp(-snapLerpSharpness * Time.deltaTime);
 
         pivot.localPosition = Vector3.Lerp(pivot.localPosition, targetPivot, t);

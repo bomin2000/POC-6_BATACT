@@ -238,6 +238,15 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
         weaponPushDelta += delta;
     }
 
+    private bool restrictLeftMovement;
+    private bool restrictRightMovement;
+
+    public void SetMovementRestrictions(bool restrictLeft, bool restrictRight)
+    {
+        restrictLeftMovement = restrictLeft;
+        restrictRightMovement = restrictRight;
+    }
+
     private void ApplyHorizontalMovement()
     {
         float targetVelocityX = horizontalInput * moveSpeed;
@@ -250,9 +259,27 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
             body.linearVelocity = new Vector2(dampenedX, body.linearVelocity.y);
         }
 
+        if (restrictLeftMovement && targetVelocityX < 0f)
+        {
+            targetVelocityX = 0f;
+        }
+        if (restrictRightMovement && targetVelocityX > 0f)
+        {
+            targetVelocityX = 0f;
+        }
+
         float control = IsGrounded ? 1f : airControlMultiplier;
         float rate = Mathf.Abs(targetVelocityX) > 0.01f ? acceleration : deceleration;
         float nextVelocityX = Mathf.MoveTowards(body.linearVelocity.x, targetVelocityX, rate * control * Time.fixedDeltaTime);
+
+        if (restrictLeftMovement && nextVelocityX < 0f)
+        {
+            nextVelocityX = 0f;
+        }
+        if (restrictRightMovement && nextVelocityX > 0f)
+        {
+            nextVelocityX = 0f;
+        }
 
         // Apply weapon push delta to position and kill opposing velocity
         if (weaponPushDelta.sqrMagnitude > 0f)

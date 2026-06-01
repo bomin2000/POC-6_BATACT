@@ -123,6 +123,22 @@ public sealed class WeaponHitbox2D : MonoBehaviour
                 continue;
             }
 
+            // Prevent attacking through walls
+            Vector2 rayOrigin = owner != null ? owner.position : transform.position;
+            Vector2 targetPos = target.bounds.center;
+            Vector2 dirToTarget = targetPos - rayOrigin;
+            float distToTarget = dirToTarget.magnitude;
+            
+            // Assume Layer 6 or 8 are terrain/ground (use LayerMask.GetMask or just generic check)
+            int obstacleLayerMask = LayerMask.GetMask("Default", "Terrain", "Ground");
+            if (obstacleLayerMask == 0) obstacleLayerMask = 1; // Fallback to Default if layers don't exist
+
+            RaycastHit2D wallHit = Physics2D.Raycast(rayOrigin, dirToTarget.normalized, distToTarget, obstacleLayerMask);
+            if (wallHit.collider != null && !wallHit.collider.isTrigger)
+            {
+                continue; // Blocked by a wall
+            }
+
             hitThisSwing.Add(target);
             Vector2 impulse = profile.reaction.BuildImpulse(
                 attackForward,
