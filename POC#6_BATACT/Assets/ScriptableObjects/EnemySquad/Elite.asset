@@ -16,7 +16,7 @@ MonoBehaviour:
   spawns:
   - enemyPrefab: {fileID: 5576281405834939419, guid: b663cba4de015ca47903f49cf7165a10, type: 3}
     localOffset: {x: -6, y: 2}
-    delay: 0
+    delay: 3
   - enemyPrefab: {fileID: 5576281405834939419, guid: b663cba4de015ca47903f49cf7165a10, type: 3}
     localOffset: {x: 6, y: 2}
     delay: 0
@@ -28,4 +28,4 @@ MonoBehaviour:
     delay: 0
   - enemyPrefab: {fileID: 4914019361791870253, guid: 04ce0418552ac87448280eebbe5c0c82, type: 3}
     localOffset: {x: -8, y: 2}
-    delay: 0
+    delay: 3

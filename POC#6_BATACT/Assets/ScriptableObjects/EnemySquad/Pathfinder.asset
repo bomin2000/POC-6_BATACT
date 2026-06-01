@@ -15,17 +15,17 @@ MonoBehaviour:
   formationName: "\uC815\uCC30\uB300"
   spawns:
   - enemyPrefab: {fileID: 79387391968581442, guid: 90338271701483345a9b85618ab42bab, type: 3}
-    localOffset: {x: 4, y: 1}
+    localOffset: {x: 16, y: 1}
     delay: 0
   - enemyPrefab: {fileID: 79387391968581442, guid: 90338271701483345a9b85618ab42bab, type: 3}
-    localOffset: {x: 2, y: 1}
+    localOffset: {x: 14, y: 1}
     delay: 0
   - enemyPrefab: {fileID: 79387391968581442, guid: 90338271701483345a9b85618ab42bab, type: 3}
-    localOffset: {x: 0, y: 1}
+    localOffset: {x: 12, y: 1}
     delay: 0
   - enemyPrefab: {fileID: 79387391968581442, guid: 90338271701483345a9b85618ab42bab, type: 3}
-    localOffset: {x: -2, y: 1}
+    localOffset: {x: 10, y: 1}
     delay: 0
   - enemyPrefab: {fileID: 79387391968581442, guid: 90338271701483345a9b85618ab42bab, type: 3}
-    localOffset: {x: -4, y: 1}
+    localOffset: {x: 8, y: 1}
     delay: 0

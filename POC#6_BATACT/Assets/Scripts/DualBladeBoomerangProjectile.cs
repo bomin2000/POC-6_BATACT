@@ -20,6 +20,7 @@ public sealed class DualBladeBoomerangProjectile : MonoBehaviour
     [SerializeField] private LayerMask targetLayers = ~0;
 
     private readonly HashSet<Collider2D> hitTargets = new HashSet<Collider2D>();
+    private readonly HashSet<Rigidbody2D> draggedBodies = new HashSet<Rigidbody2D>();
     private readonly Collider2D[] overlapBuffer = new Collider2D[16];
 
     private Transform owner;
@@ -51,7 +52,9 @@ public sealed class DualBladeBoomerangProjectile : MonoBehaviour
         elapsed = 0f;
         returning = false;
         initialized = true;
+        
         hitTargets.Clear();
+        draggedBodies.Clear();
 
         if (profile != null && profile.name.Contains("Empowered"))
         {
@@ -100,11 +103,28 @@ public sealed class DualBladeBoomerangProjectile : MonoBehaviour
         TickHitOverlap();
     }
 
+    private void FixedUpdate()
+    {
+        if (!initialized || draggedBodies.Count == 0) return;
+
+        draggedBodies.RemoveWhere(b => b == null || !b.gameObject.activeInHierarchy);
+
+        foreach (var body in draggedBodies)
+        {
+            Vector2 dirToBoomerang = (Vector2)transform.position - body.position;
+            // Drag the enemy continuously towards the boomerang
+            body.linearVelocity = dirToBoomerang * 15f;
+        }
+    }
+
     private void BeginReturn()
     {
         returning = true;
         elapsed = 0f;
         returnStartPosition = transform.position;
+        
+        // Clear hit targets so they can be hit (and damaged) again on the return trip
+        hitTargets.Clear();
     }
 
     private void TickCurvedReturn()
@@ -124,6 +144,7 @@ public sealed class DualBladeBoomerangProjectile : MonoBehaviour
 
         if (Vector2.Distance(transform.position, target) <= catchRadius || elapsed >= maxBareHandSeconds)
         {
+            draggedBodies.Clear();
             Caught?.Invoke(this);
         }
     }
@@ -151,6 +172,14 @@ public sealed class DualBladeBoomerangProjectile : MonoBehaviour
             }
 
             hitTargets.Add(target);
+
+            // Hook the target for dragging
+            Rigidbody2D body = target.GetComponentInParent<Rigidbody2D>();
+            if (body != null && !body.isKinematic)
+            {
+                draggedBodies.Add(body);
+            }
+
             Vector2 impulse = hitProfile.reaction.BuildImpulse(
                 launchDirection,
                 owner.position,

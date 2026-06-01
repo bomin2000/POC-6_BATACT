@@ -3,10 +3,10 @@ using UnityEngine;
 using UnityEngine.Events;
 
 [RequireComponent(typeof(Rigidbody2D))]
-public sealed class PrototypeEnemyHitReceiver : MonoBehaviour, IWeaponHitReceiver
+public sealed class EnemyBody : MonoBehaviour, IWeaponHitReceiver
 {
     [Header("Health")]
-    [SerializeField] private float maxHealth = 100f;
+    [SerializeField] private float maxHealth = 150f;
     [SerializeField] private bool destroyOnDeath = true;
     [SerializeField] private float deathDestroyDelay = 0.05f;
 
@@ -40,21 +40,12 @@ public sealed class PrototypeEnemyHitReceiver : MonoBehaviour, IWeaponHitReceive
     private static float lastHitStopTime = -999f;
 
     private StatusTagController tagController;
+    private ShieldGuardTrait shieldTrait;
 
     public float CurrentHealth { get; private set; }
     public float MaxHealth => maxHealth;
     public bool IsStunned { get; private set; }
     public bool IsDead => isDead;
-
-    public bool HasTag(StatusTag tag)
-    {
-        return tagController != null && tagController.HasTag(tag);
-    }
-
-    public bool HasAnyTag()
-    {
-        return tagController != null && tagController.HasAnyTag();
-    }
 
     private void Awake()
     {
@@ -62,11 +53,7 @@ public sealed class PrototypeEnemyHitReceiver : MonoBehaviour, IWeaponHitReceive
         chaser = GetComponent<EnemySideViewChaser>();
         colliders = GetComponentsInChildren<Collider2D>();
         tagController = GetComponent<StatusTagController>();
-        
-        // Ensure legacy enemies have a StatusTagController automatically added
-        if (tagController == null) {
-            tagController = gameObject.AddComponent<StatusTagController>();
-        }
+        shieldTrait = GetComponentInChildren<ShieldGuardTrait>();
 
         if (body != null)
         {
@@ -111,28 +98,39 @@ public sealed class PrototypeEnemyHitReceiver : MonoBehaviour, IWeaponHitReceive
             return;
         }
 
-        // 1. Calculate final damage
         float finalDamage = reaction.damage;
-        if (HasAnyTag() && reaction.taggedDamageMultiplier > 1f)
+        float stunMultiplier = 1f;
+
+        // Check for shield mitigation
+        if (shieldTrait != null && shieldTrait.IsGuarding(source.transform.position))
         {
-            finalDamage *= reaction.taggedDamageMultiplier;
-            // Visual flair for tagged hit
-            if (flashRenderer != null)
-            {
-                // Make the hit flash slightly different for critical tag hit if desired
-                hitColor = Color.magenta; 
-            }
+            finalDamage *= (1f - shieldTrait.DamageReduction);
+            stunMultiplier = 0.5f; // Reduce stun if guarded
+            impulse *= 0.5f; // Reduce knockback if guarded
+            // Optional: add a block sound or visual here
         }
         else
         {
-            hitColor = Color.white; // reset to normal if needed, though original is white
+            // Tag bonuses only apply if not guarded (or maybe they do? let's apply them)
+            if (tagController != null && tagController.HasAnyTag() && reaction.taggedDamageMultiplier > 1f)
+            {
+                finalDamage *= reaction.taggedDamageMultiplier;
+                if (flashRenderer != null)
+                {
+                    hitColor = Color.magenta;
+                }
+            }
+            else
+            {
+                hitColor = Color.white;
+            }
         }
 
         CurrentHealth -= finalDamage;
         CurrentHealth = Mathf.Clamp(CurrentHealth, 0f, maxHealth);
         HealthChanged?.Invoke(CurrentHealth, maxHealth);
 
-        // 2. Apply new tags
+        // Apply tags
         if (tagController != null && reaction.appliedTag != StatusTag.None && reaction.tagDuration > 0f)
         {
             tagController.AddTag(reaction.appliedTag, reaction.tagDuration);
@@ -150,7 +148,8 @@ public sealed class PrototypeEnemyHitReceiver : MonoBehaviour, IWeaponHitReceive
             StopCoroutine(stunRoutine);
         }
 
-        stunRoutine = StartCoroutine(StunRoutine(Mathf.Max(minimumHitStun, reaction.stunSeconds)));
+        float finalStun = Mathf.Max(minimumHitStun, reaction.stunSeconds) * stunMultiplier;
+        stunRoutine = StartCoroutine(StunRoutine(finalStun));
         StartCoroutine(FlashRoutine());
 
         if (hitStopSeconds > 0f && Time.unscaledTime - lastHitStopTime >= hitStopCooldown)
@@ -192,10 +191,7 @@ public sealed class PrototypeEnemyHitReceiver : MonoBehaviour, IWeaponHitReceive
 
     private void ApplyReactionDrag(HitReactionData reaction)
     {
-        if (body == null)
-        {
-            return;
-        }
+        if (body == null) return;
 
         if (restoreDragRoutine != null)
         {
@@ -256,10 +252,7 @@ public sealed class PrototypeEnemyHitReceiver : MonoBehaviour, IWeaponHitReceive
 
     private void Die()
     {
-        if (isDead)
-        {
-            return;
-        }
+        if (isDead) return;
 
         isDead = true;
         IsStunned = true;
@@ -278,7 +271,7 @@ public sealed class PrototypeEnemyHitReceiver : MonoBehaviour, IWeaponHitReceive
 
         for (int i = 0; i < colliders.Length; i++)
         {
-            colliders[i].enabled = false;
+            if (colliders[i] != null) colliders[i].enabled = false;
         }
 
         Died?.Invoke();

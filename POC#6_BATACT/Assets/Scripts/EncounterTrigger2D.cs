@@ -44,6 +44,14 @@ public class EncounterTrigger2D : MonoBehaviour
     private void Start()
     {
         ResolveTarget();
+
+        // 안전장치: 기존 EnemySpawner가 씬에 켜져 있다면 중복 스폰 방지를 위해 강제로 끕니다.
+        EnemySpawner oldSpawner = FindFirstObjectByType<EnemySpawner>();
+        if (oldSpawner != null && oldSpawner.gameObject.activeInHierarchy)
+        {
+            Debug.LogWarning($"[Encounter] '{encounterName}' - 씬에 기존 EnemySpawner가 켜져 있습니다. 중복 스폰 방지를 위해 해당 Spawner를 비활성화합니다.");
+            oldSpawner.gameObject.SetActive(false);
+        }
     }
 
     private void OnTriggerEnter2D(Collider2D collision)
@@ -123,36 +131,81 @@ public class EncounterTrigger2D : MonoBehaviour
     private void OnDrawGizmos()
     {
         // 트리거 범위 표시 (BoxCollider2D 기준)
-        BoxCollider2D box = GetComponent<BoxCollider2D>();
-        if (box != null)
+        Collider2D col = GetComponent<Collider2D>();
+        if (col != null)
         {
-            Gizmos.color = new Color(1f, 0.5f, 0f, 0.3f); // 주황색 반투명
-            Gizmos.matrix = transform.localToWorldMatrix;
-            Gizmos.DrawCube(box.offset, box.size);
-            Gizmos.color = new Color(1f, 0.5f, 0f, 1f);
-            Gizmos.DrawWireCube(box.offset, box.size);
-            Gizmos.matrix = Matrix4x4.identity;
+            if (col is BoxCollider2D box)
+            {
+                Gizmos.color = new Color(1f, 0.5f, 0f, 0.3f); // 주황색 반투명
+                Gizmos.matrix = transform.localToWorldMatrix;
+                Gizmos.DrawCube(box.offset, box.size);
+                Gizmos.color = new Color(1f, 0.5f, 0f, 1f);
+                Gizmos.DrawWireCube(box.offset, box.size);
+                Gizmos.matrix = Matrix4x4.identity;
+            }
+            else
+            {
+                Gizmos.color = new Color(1f, 0.5f, 0f, 0.3f);
+                Gizmos.DrawCube(col.bounds.center, col.bounds.size);
+                Gizmos.color = new Color(1f, 0.5f, 0f, 1f);
+                Gizmos.DrawWireCube(col.bounds.center, col.bounds.size);
+            }
         }
 
-        DrawProfileGizmos();
+        DrawProfileGizmos(col != null ? col.bounds.center : transform.position);
     }
 
-    private void DrawProfileGizmos()
+    private void DrawProfileGizmos(Vector3 centerPosition)
     {
-        if (formationProfile == null || formationProfile.spawns == null) return;
-
-        foreach (var data in formationProfile.spawns)
+        if (formationProfile == null || formationProfile.spawns == null || formationProfile.spawns.Length == 0)
         {
+#if UNITY_EDITOR
+            UnityEditor.Handles.Label(centerPosition, "No Formation Profile Assigned", new GUIStyle() { normal = new GUIStyleState() { textColor = Color.red }, fontStyle = FontStyle.Bold, fontSize = 14 });
+#endif
+            return;
+        }
+
+        for (int i = 0; i < formationProfile.spawns.Length; i++)
+        {
+            var data = formationProfile.spawns[i];
             Vector3 worldPos = transform.position + (Vector3)data.localOffset;
+
+            // Determine color based on enemy type/name
+            Color gizmoColor = Color.white;
+            string enemyName = "Empty";
             
-            Gizmos.color = new Color(1f, 0.8f, 0f, 1f); // 노란색(프로필 스폰)
+            if (data.enemyPrefab != null)
+            {
+                enemyName = data.enemyPrefab.name;
+                string lowerName = enemyName.ToLower();
+
+                if (lowerName.Contains("fast")) gizmoColor = Color.yellow;
+                else if (lowerName.Contains("ranged") || lowerName.Contains("shooter")) gizmoColor = Color.red;
+                else if (lowerName.Contains("bomb") || lowerName.Contains("selfdestruct")) gizmoColor = Color.cyan;
+                else gizmoColor = Color.green;
+            }
+
+            // Draw connecting line
+            Gizmos.color = new Color(gizmoColor.r, gizmoColor.g, gizmoColor.b, 0.4f);
+            Gizmos.DrawLine(centerPosition, worldPos);
+
+            // Draw spawn marker
+            Gizmos.color = gizmoColor;
             Gizmos.DrawWireSphere(worldPos, 0.5f);
-            Gizmos.color = new Color(1f, 0.8f, 0f, 0.5f);
-            Gizmos.DrawLine(transform.position, worldPos);
-            
-            // X 표시
             Gizmos.DrawLine(worldPos - Vector3.right * 0.5f, worldPos + Vector3.right * 0.5f);
             Gizmos.DrawLine(worldPos - Vector3.up * 0.5f, worldPos + Vector3.up * 0.5f);
+
+#if UNITY_EDITOR
+            // Draw Label
+            GUIStyle style = new GUIStyle();
+            style.normal.textColor = gizmoColor;
+            style.fontStyle = FontStyle.Bold;
+            style.fontSize = 12;
+            style.alignment = TextAnchor.MiddleCenter;
+
+            string labelText = $"[{i}] {enemyName}\n(Delay: {data.delay}s)";
+            UnityEditor.Handles.Label(worldPos + Vector3.up * 0.8f, labelText, style);
+#endif
         }
     }
 }

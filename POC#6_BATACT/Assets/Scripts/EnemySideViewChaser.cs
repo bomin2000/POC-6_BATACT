@@ -46,6 +46,8 @@ public sealed class EnemySideViewChaser : MonoBehaviour
     private bool externallyStunned;
     private static readonly List<EnemySideViewChaser> ActiveEnemies = new List<EnemySideViewChaser>();
 
+    public int FacingSign => facingSign;
+
     private void Awake()
     {
         body = GetComponent<Rigidbody2D>();

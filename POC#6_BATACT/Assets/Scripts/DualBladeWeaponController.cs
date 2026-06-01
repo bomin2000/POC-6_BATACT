@@ -90,6 +90,25 @@ public sealed class DualBladeWeaponController : MonoBehaviour
     public bool IsInputLocked => CurrentState == WeaponState.BareHand;
     public Transform WeaponRoot => weaponRoot;
 
+    public Vector2 AimDirection => aimDirection;
+
+    public void ExecuteAssistAttack(bool secondary = false)
+    {
+        if (CurrentState == WeaponState.BareHand) return;
+
+        lastAutoAttackTime = Time.time;
+        // Removed consecutiveHitCount = 0 so assist attacks don't break the combo
+        
+        if (secondary)
+        {
+            FireSecondaryAttack();
+        }
+        else
+        {
+            FirePrimaryAttack();
+        }
+    }
+
     public bool ContainsWeaponCollider(Collider2D candidate)
     {
         if (candidate == null || weaponRoot == null)
@@ -394,10 +413,53 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         }
     }
 
+    public bool CanAutoAttackNow
+    {
+        get
+        {
+            if (CurrentState == WeaponState.BareHand) return false;
+            float currentInterval = 1f;
+            switch (CurrentState)
+            {
+                case WeaponState.Spear: currentInterval = spearAutoAttackInterval; break;
+                case WeaponState.Scissors: currentInterval = scissorsAutoAttackInterval; break;
+                case WeaponState.Boomerang: currentInterval = boomerangAutoAttackInterval; break;
+            }
+            return Time.time >= lastAutoAttackTime + currentInterval;
+        }
+    }
+
+    public void TryAutoAttackFromAssist()
+    {
+        if (CurrentState == WeaponState.BareHand) return;
+
+        float currentInterval = 1f;
+        switch (CurrentState)
+        {
+            case WeaponState.Spear: currentInterval = spearAutoAttackInterval; break;
+            case WeaponState.Scissors: currentInterval = scissorsAutoAttackInterval; break;
+            case WeaponState.Boomerang: currentInterval = boomerangAutoAttackInterval; break;
+        }
+
+        if (Time.time >= lastAutoAttackTime + currentInterval)
+        {
+            lastAutoAttackTime = Time.time;
+            if (consecutiveHitCount >= requiredHitsForSecondary)
+            {
+                consecutiveHitCount = 0;
+                FireSecondaryAttack();
+            }
+            else
+            {
+                FirePrimaryAttack();
+            }
+        }
+    }
+
     private void ReadAttackInput()
     {
         bool isKeyDown = Input.GetKeyDown(attackKey);
-        bool isKeyHeld = Input.GetKey(attackKey);
+        bool isKeyHeld = Input.GetKey(attackKey); 
 
         if (CurrentState == WeaponState.BareHand)
         {

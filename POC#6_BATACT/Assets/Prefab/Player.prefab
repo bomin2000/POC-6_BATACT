@@ -500,6 +500,7 @@ GameObject:
   - component: {fileID: 2203174731317011125}
   - component: {fileID: -4791114409827709881}
   - component: {fileID: -1273536668962164304}
+  - component: {fileID: 6270381126169225356}
   m_Layer: 6
   m_Name: Player
   m_TagString: Untagged
@@ -792,12 +793,12 @@ MonoBehaviour:
   spearLength: 2.5
   scissorsRadius: 2.5
   probeRadius: 0.2
-  maxPushDelta: 0.5
   jumpKey: 32
-  floorVaultUpImpulse: 18
-  wallVaultSideImpulse: 15
-  wallVaultUpImpulse: 14
+  poleVaultUpImpulse: 18
+  poleVaultForwardImpulse: 5
   vaultCooldown: 0.4
+  plantAngleThreshold: 25
+  smoothLiftSpeed: 10
 --- !u!114 &-1273536668962164304
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -811,9 +812,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerWallSlideAssist
   isActive: 1
-  attackKey: 323
-  wallSlideMaxFallSpeed: 2.5
+  wallSlideMaxFallSpeed: 1
   wallSlideAcceleration: 20
+  jumpKey: 32
+  wallJumpSideImpulse: 12
+  wallJumpUpImpulse: 15
   wallCheckSize: {x: 0.1, y: 0.8}
   wallCheckDistance: 0.5
   groundLayers:
@@ -821,9 +824,34 @@ MonoBehaviour:
     m_Bits: 0
   debugIsWallSliding: 0
   debugWallDirection: 0
-  debugIsHoldingAttack: 0
   debugIsAirborne: 0
   debugCurrentFallSpeed: 0
+--- !u!114 &6270381126169225356
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4615884595108132435}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 11c2de46da4dae94bb47d2f395ced788, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ScissorsTerrainGripAssist
+  terrainProbe: {fileID: 0}
+  playerMovement: {fileID: 0}
+  spaceChecker: {fileID: 0}
+  isActive: 1
+  attackKey: 323
+  gripDuration: 0.15
+  gripVelocityDamping: 0.5
+  gripCooldown: 0.1
+  enableDebugLogging: 0
+  debugCanGrip: 0
+  debugIsGripping: 0
+  debugLastGripCollider: {fileID: 0}
+  debugLastGripTime: -999
+  debugGripBlockReason: 
 --- !u!1 &5105635373414431685
 GameObject:
   m_ObjectHideFlags: 0

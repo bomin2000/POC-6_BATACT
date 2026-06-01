@@ -22,8 +22,11 @@ MonoBehaviour:
   recoverySeconds: 0.4
   reaction:
     reactionType: 0
-    damage: 80
-    knockbackForce: 45
-    stunSeconds: 0.3
+    damage: 15
+    knockbackForce: 30
+    stunSeconds: 0.4
+    taggedDamageMultiplier: 1
+    appliedTag: 0
+    tagDuration: 0
     extraImpulse: {x: 0, y: 0}
   healOnHit: 15
