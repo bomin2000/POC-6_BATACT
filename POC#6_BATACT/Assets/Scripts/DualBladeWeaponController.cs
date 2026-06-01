@@ -205,6 +205,15 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         ReadAttackInput();
         SmoothSnapVisibleForm();
         UpdateComboIndicator();
+
+        // Sync player swing state with boomerang anchor state (e.g. auto-release on timeout)
+        if (playerMovement != null && playerMovement.IsRopeSwinging)
+        {
+            if (activeBoomerang == null || !activeBoomerang.IsAnchored)
+            {
+                playerMovement.LaunchFromSwing();
+            }
+        }
     }
 
     private void EnsureComboIndicator()
@@ -459,11 +468,36 @@ public sealed class DualBladeWeaponController : MonoBehaviour
     private void ReadAttackInput()
     {
         bool isKeyDown = Input.GetKeyDown(attackKey);
+        bool isRightClick = Input.GetKeyDown(boomerangSelectKey); // Mouse2 or Mouse1 depending on settings, usually Mouse1 for secondary
         bool isKeyHeld = Input.GetKey(attackKey); 
 
         if (CurrentState == WeaponState.BareHand)
         {
             canAutoAttack = false;
+
+            // Handle Rope Actions while Anchored
+            if (activeBoomerang != null && activeBoomerang.IsAnchored)
+            {
+                // Left Click: Zip to anchor
+                if (isKeyDown)
+                {
+                    if (playerMovement != null && !playerMovement.IsRopeMoving)
+                    {
+                        playerMovement.OnRopeMoveFinished -= HandleRopeMoveFinished; // safety clear
+                        playerMovement.OnRopeMoveFinished += HandleRopeMoveFinished;
+                        playerMovement.StartRopeMove(activeBoomerang.AnchoredPosition);
+                    }
+                }
+                // Right Click / Boomerang Select Key: Release anchor and fly
+                else if (isRightClick || Input.GetKeyDown(KeyCode.Mouse1))
+                {
+                    if (playerMovement != null && playerMovement.IsRopeSwinging)
+                    {
+                        // Launch the player with momentum
+                        playerMovement.LaunchFromSwing();
+                    }
+                }
+            }
             return;
         }
 
@@ -659,9 +693,41 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         activeBoomerang = Instantiate(boomerangPrefab, throwSpawnPoint.position, Quaternion.identity);
         activeBoomerang.Caught += OnBoomerangCaught;
         activeBoomerang.OnHit += HandleHitSuccessful;
+        activeBoomerang.OnAnchoredEvent += OnBoomerangAnchored;
         activeBoomerang.Launch(transform, actualProfile, aimDirection);
 
         TransitionTo(WeaponState.BareHand);
+    }
+
+    private void OnBoomerangAnchored(Vector3 anchorPos)
+    {
+        if (playerMovement != null)
+        {
+            playerMovement.OnRopeSwingCanceled -= HandleRopeSwingCanceled;
+            playerMovement.OnRopeSwingCanceled += HandleRopeSwingCanceled;
+            playerMovement.StartRopeSwing(anchorPos);
+        }
+    }
+
+    private void HandleRopeSwingCanceled()
+    {
+        if (activeBoomerang != null)
+        {
+            activeBoomerang.ReleaseAnchor();
+        }
+    }
+
+    private void HandleRopeMoveFinished()
+    {
+        if (playerMovement != null)
+        {
+            playerMovement.OnRopeMoveFinished -= HandleRopeMoveFinished;
+        }
+
+        if (activeBoomerang != null)
+        {
+            activeBoomerang.ReleaseAnchor();
+        }
     }
 
     private void OnBoomerangCaught(DualBladeBoomerangProjectile projectile)
@@ -673,13 +739,14 @@ public sealed class DualBladeWeaponController : MonoBehaviour
 
         activeBoomerang.Caught -= OnBoomerangCaught;
         activeBoomerang.OnHit -= HandleHitSuccessful;
+        activeBoomerang.OnAnchoredEvent -= OnBoomerangAnchored;
         Destroy(activeBoomerang.gameObject);
         activeBoomerang = null;
 
-        PlayerTopDownMovement movement = GetComponent<PlayerTopDownMovement>();
-        if (movement != null)
+        if (playerMovement != null)
         {
-            movement.StabilizeAfterBoomerangCatch(catchStabilizeSeconds);
+            playerMovement.OnRopeSwingCanceled -= HandleRopeSwingCanceled;
+            playerMovement.StabilizeAfterBoomerangCatch(catchStabilizeSeconds);
         }
 
         WeaponState nextState = QueuedState.HasValue ? QueuedState.Value : WeaponState.Boomerang;

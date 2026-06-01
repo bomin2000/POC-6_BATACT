@@ -31,9 +31,21 @@ public sealed class DualBladeBoomerangProjectile : MonoBehaviour
     private bool returning;
     private bool initialized;
 
+    // Anchor State
+    private bool isAnchored;
+    private Vector3 anchoredPosition;
+    private float anchoredTimer;
+    private const float MAX_ANCHOR_TIME = 6.0f; // Increased for longer swinging
+
+    private LineRenderer lineRenderer;
+
     public bool IsReturning => returning;
+    public bool IsAnchored => isAnchored;
+    public Vector3 AnchoredPosition => anchoredPosition;
+
     public System.Action<DualBladeBoomerangProjectile> Caught;
     public System.Action<Collider2D, WeaponHitboxProfile> OnHit;
+    public System.Action<Vector3> OnAnchoredEvent;
 
     private void Awake()
     {
@@ -42,6 +54,18 @@ public sealed class DualBladeBoomerangProjectile : MonoBehaviour
         {
             col.isTrigger = true;
         }
+
+        lineRenderer = GetComponent<LineRenderer>();
+        if (lineRenderer == null)
+        {
+            lineRenderer = gameObject.AddComponent<LineRenderer>();
+            lineRenderer.positionCount = 2;
+            lineRenderer.startWidth = 0.08f;
+            lineRenderer.endWidth = 0.02f;
+            lineRenderer.useWorldSpace = true;
+            // Simple visual defaults, user can configure prefab
+        }
+        lineRenderer.enabled = false;
     }
 
     public void Launch(Transform ownerTransform, WeaponHitboxProfile profile, Vector2 direction)
@@ -51,7 +75,10 @@ public sealed class DualBladeBoomerangProjectile : MonoBehaviour
         launchDirection = direction.sqrMagnitude > 0.0001f ? direction.normalized : Vector2.right;
         elapsed = 0f;
         returning = false;
+        isAnchored = false;
         initialized = true;
+        
+        if (lineRenderer != null) lineRenderer.enabled = false;
         
         hitTargets.Clear();
         draggedBodies.Clear();
@@ -76,6 +103,35 @@ public sealed class DualBladeBoomerangProjectile : MonoBehaviour
         }
     }
 
+    private TextMesh timerTextMesh;
+
+    private void EnsureTimerIndicator()
+    {
+        if (timerTextMesh == null)
+        {
+            GameObject go = new GameObject("AnchorTimerIndicator");
+            // DO NOT set parent to avoid inheriting any rotation or scale from the spinning boomerang
+            
+            timerTextMesh = go.AddComponent<TextMesh>();
+            timerTextMesh.anchor = TextAnchor.MiddleCenter;
+            timerTextMesh.alignment = TextAlignment.Center;
+            timerTextMesh.fontSize = 60;
+            timerTextMesh.characterSize = 0.08f;
+            timerTextMesh.color = Color.cyan;
+            
+            MeshRenderer mr = go.GetComponent<MeshRenderer>();
+            mr.sortingOrder = 40; 
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (timerTextMesh != null && timerTextMesh.gameObject != null)
+        {
+            Destroy(timerTextMesh.gameObject);
+        }
+    }
+
     private void Update()
     {
         if (!initialized || owner == null)
@@ -83,8 +139,56 @@ public sealed class DualBladeBoomerangProjectile : MonoBehaviour
             return;
         }
 
-        elapsed += Time.deltaTime;
         transform.Rotate(0f, 0f, spinDegreesPerSecond * Time.deltaTime);
+
+        if (isAnchored)
+        {
+            transform.position = anchoredPosition;
+            anchoredTimer += Time.deltaTime;
+
+            if (lineRenderer != null && owner != null)
+            {
+                lineRenderer.SetPosition(0, owner.position);
+                lineRenderer.SetPosition(1, transform.position);
+            }
+            
+            EnsureTimerIndicator();
+            timerTextMesh.gameObject.SetActive(true);
+            
+            // Constantly update position in world space
+            timerTextMesh.transform.position = transform.position + new Vector3(0f, 1.2f, 0f);
+            timerTextMesh.transform.rotation = Quaternion.identity;
+
+            float timeLeft = Mathf.Max(0f, MAX_ANCHOR_TIME - anchoredTimer);
+            timerTextMesh.text = $"{timeLeft:F1}s";
+            
+            if (timeLeft <= 2f)
+            {
+                timerTextMesh.color = Color.Lerp(Color.red, Color.yellow, Mathf.PingPong(Time.time * 15f, 1f));
+                timerTextMesh.transform.localScale = Vector3.one * (1f + Mathf.PingPong(Time.time * 5f, 0.2f));
+            }
+            else
+            {
+                timerTextMesh.color = Color.cyan;
+                timerTextMesh.transform.localScale = Vector3.one;
+            }
+
+            // Auto-return if hung for too long
+            if (anchoredTimer >= MAX_ANCHOR_TIME)
+            {
+                ReleaseAnchor();
+            }
+            return;
+        }
+        else
+        {
+            if (timerTextMesh != null)
+            {
+                timerTextMesh.gameObject.SetActive(false);
+            }
+        }
+
+        elapsed += Time.deltaTime;
 
         if (!returning)
         {
@@ -117,11 +221,22 @@ public sealed class DualBladeBoomerangProjectile : MonoBehaviour
         }
     }
 
+    public void ReleaseAnchor()
+    {
+        if (isAnchored)
+        {
+            isAnchored = false;
+            // Begin return from the anchored spot
+            BeginReturn();
+        }
+    }
+
     private void BeginReturn()
     {
         returning = true;
         elapsed = 0f;
         returnStartPosition = transform.position;
+        if (lineRenderer != null) lineRenderer.enabled = false;
         
         // Clear hit targets so they can be hit (and damaged) again on the return trip
         hitTargets.Clear();
@@ -163,6 +278,30 @@ public sealed class DualBladeBoomerangProjectile : MonoBehaviour
             if (target == null || hitTargets.Contains(target))
             {
                 continue;
+            }
+            
+            // Check for Anchorable
+            if (!returning && !isAnchored)
+            {
+                BoomerangAnchorable anchor = target.GetComponentInParent<BoomerangAnchorable>();
+                if (anchor != null)
+                {
+                    Vector3 anchorPos = anchor.GetAnchorPosition();
+                    
+                    // Prevent getting "tangled" if the player throws the boomerang while basically standing ON the anchor
+                    if (owner != null && Vector3.Distance(owner.position, anchorPos) < 1.0f)
+                    {
+                        continue;
+                    }
+
+                    isAnchored = true;
+                    anchoredPosition = anchorPos;
+                    anchoredTimer = 0f;
+                    hitTargets.Add(target); // Prevent re-triggering on same anchor
+                    if (lineRenderer != null) lineRenderer.enabled = true;
+                    OnAnchoredEvent?.Invoke(anchoredPosition);
+                    continue; // Do not apply damage to the anchor
+                }
             }
 
             IWeaponHitReceiver receiver = target.GetComponentInParent<IWeaponHitReceiver>();

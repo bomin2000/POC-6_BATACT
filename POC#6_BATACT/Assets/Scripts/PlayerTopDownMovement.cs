@@ -51,6 +51,8 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
     private readonly RaycastHit2D[] groundCastHits = new RaycastHit2D[8];
     private ContactFilter2D groundContactFilter;
     private float horizontalInput;
+    private float verticalInput;
+
     private float coyoteTimer;
     private float jumpBufferTimer;
     private float dashTimer;
@@ -62,6 +64,20 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
     private float defaultGravityScale;
     private bool hasAimFacingOverride;
     private int aimFacingSign = 1;
+
+    // Rope Move Fields
+    private bool isRopeMoving;
+    private Vector2 ropeTargetPos;
+    [Header("Rope Move")]
+    [SerializeField] private float ropeMoveSpeed = 35f;
+    [SerializeField] private float ropeArrivalDistance = 1.0f;
+    public bool IsRopeMoving => isRopeMoving;
+    public System.Action OnRopeMoveFinished;
+
+    // Rope Swing Fields
+    private DistanceJoint2D ropeSwingJoint;
+    public bool IsRopeSwinging => ropeSwingJoint != null && ropeSwingJoint.enabled;
+    public System.Action OnRopeSwingCanceled;
 
     private void Awake()
     {
@@ -83,6 +99,7 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
     private void Update()
     {
         horizontalInput = Input.GetAxisRaw("Horizontal");
+        verticalInput = Input.GetAxisRaw("Vertical");
 
         if (catchStabilizeTimer > 0f)
         {
@@ -124,6 +141,12 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
     {
         UpdateGrounded();
 
+        if (isRopeMoving)
+        {
+            TickRopeMove();
+            return;
+        }
+
         if (dashBufferTimer > 0f)
         {
             TryStartDash();
@@ -147,9 +170,128 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
             return;
         }
 
+        if (IsRopeSwinging)
+        {
+            if (Mathf.Abs(verticalInput) > 0.01f && ropeSwingJoint != null)
+            {
+                float newDistance = ropeSwingJoint.distance - (verticalInput * 10f * Time.fixedDeltaTime);
+                ropeSwingJoint.distance = Mathf.Clamp(newDistance, 1.0f, 15f);
+            }
+
+            if (IsGrounded)
+            {
+                // If grounded, allow normal walking (constrained by max distance)
+                ApplyHorizontalMovement();
+            }
+            else
+            {
+                TickRopeSwingMovement();
+            }
+            TryConsumeJump();
+            return;
+        }
+
         ApplyHorizontalMovement();
         TryConsumeJump();
         ApplyBetterJumpGravity();
+    }
+
+    private void TickRopeSwingMovement()
+    {
+        if (Mathf.Abs(horizontalInput) > 0.01f)
+        {
+            // Apply force to swing left/right instead of setting velocity directly
+            body.AddForce(Vector2.right * horizontalInput * acceleration * 0.35f);
+        }
+        
+        ApplyBetterJumpGravity();
+    }
+
+    public void StartRopeSwing(Vector2 anchorPos)
+    {
+        if (ropeSwingJoint == null)
+        {
+            ropeSwingJoint = gameObject.AddComponent<DistanceJoint2D>();
+            ropeSwingJoint.enableCollision = true;
+            ropeSwingJoint.maxDistanceOnly = true;
+            ropeSwingJoint.autoConfigureDistance = false;
+            ropeSwingJoint.autoConfigureConnectedAnchor = false;
+        }
+
+        ropeSwingJoint.autoConfigureConnectedAnchor = false;
+        ropeSwingJoint.connectedAnchor = anchorPos;
+        ropeSwingJoint.distance = Vector2.Distance(body.position, anchorPos);
+        ropeSwingJoint.enabled = true;
+    }
+
+    public void StopRopeSwing(bool invokeEvent = true)
+    {
+        if (ropeSwingJoint != null && ropeSwingJoint.enabled)
+        {
+            ropeSwingJoint.enabled = false;
+            if (invokeEvent)
+            {
+                OnRopeSwingCanceled?.Invoke();
+            }
+        }
+    }
+
+    public void LaunchFromSwing()
+    {
+        if (ropeSwingJoint == null || !ropeSwingJoint.enabled) return;
+
+        Vector2 currentVel = body.linearVelocity;
+        
+        StopRopeSwing(true);
+        
+        // Boost momentum to make the swing launch feel good
+        currentVel *= 1.35f; 
+
+        // Apply external lock so that horizontal input doesn't instantly kill the velocity
+        externalControlLockTimer = 0.4f; 
+        
+        body.linearVelocity = currentVel;
+        body.gravityScale = defaultGravityScale;
+    }
+
+    public void StartRopeMove(Vector2 targetPos)
+    {
+        StopRopeSwing(false); // Don't trigger cancellation event, we are transitioning to Zip
+        isRopeMoving = true;
+        ropeTargetPos = targetPos;
+        body.gravityScale = 0f; // Turn off gravity while pulling
+        dashTimer = 0f; // Cancel dashes
+    }
+
+    public void CancelRopeMove()
+    {
+        if (isRopeMoving)
+        {
+            isRopeMoving = false;
+            body.gravityScale = defaultGravityScale;
+            OnRopeMoveFinished?.Invoke();
+        }
+    }
+
+    private void TickRopeMove()
+    {
+        Vector2 currentPos = body.position;
+        float dist = Vector2.Distance(currentPos, ropeTargetPos);
+
+        if (dist <= 1.0f)
+        {
+            // Arrived
+            CancelRopeMove();
+            // Kill velocity
+            body.linearVelocity = Vector2.zero;
+        }
+        else
+        {
+            Vector2 dir = (ropeTargetPos - currentPos).normalized;
+            body.linearVelocity = dir * ropeMoveSpeed;
+            // Face direction of travel
+            FacingSign = dir.x >= 0f ? 1 : -1;
+        }
     }
 
     private void UpdateGrounded()
@@ -311,6 +453,16 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
             return;
         }
 
+        if (isRopeMoving)
+        {
+            CancelRopeMove();
+        }
+
+        if (IsRopeSwinging)
+        {
+            StopRopeSwing();
+        }
+
         jumpBufferTimer = 0f;
         coyoteTimer = 0f;
         body.linearVelocity = new Vector2(body.linearVelocity.x, jumpVelocity);
@@ -322,7 +474,7 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
         {
             body.gravityScale = defaultGravityScale * fallGravityMultiplier;
         }
-        else if (body.linearVelocity.y > 0.01f && !Input.GetKey(jumpKey))
+        else if (body.linearVelocity.y > 0.01f && (!Input.GetKey(jumpKey) && externalControlLockTimer <= 0f))
         {
             body.gravityScale = defaultGravityScale * lowJumpGravityMultiplier;
         }
@@ -348,6 +500,17 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
 
             hasAirDash = false;
         }
+
+        if (isRopeMoving)
+        {
+            CancelRopeMove();
+        }
+
+        if (IsRopeSwinging)
+        {
+            StopRopeSwing();
+        }
+
 
         int dashSign = FacingSign;
         if (dashUsesMoveInputFirst && Mathf.Abs(horizontalInput) > 0.01f)
@@ -410,6 +573,16 @@ public sealed class PlayerTopDownMovement : MonoBehaviour
 
     public void ApplyExternalKnockback(Vector2 impulse, float controlLockSeconds)
     {
+        if (isRopeMoving)
+        {
+            CancelRopeMove();
+        }
+
+        if (IsRopeSwinging)
+        {
+            StopRopeSwing();
+        }
+
         externalControlLockTimer = Mathf.Max(externalControlLockTimer, controlLockSeconds);
         dashTimer = 0f;
         body.gravityScale = defaultGravityScale;

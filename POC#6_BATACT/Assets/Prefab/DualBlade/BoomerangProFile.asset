@@ -22,7 +22,8 @@ MonoBehaviour:
   recoverySeconds: 0.1
   reaction:
     reactionType: 1
-    damage: 25
+    damage: 6
+    partDamageMultiplier: 0
     knockbackForce: 4
     stunSeconds: 0.1
     taggedDamageMultiplier: 1

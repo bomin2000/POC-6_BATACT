@@ -14,18 +14,24 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::EncounterFormationProfile
   formationName: "\uC815\uC608\uBD84\uB300"
   spawns:
-  - enemyPrefab: {fileID: 5576281405834939419, guid: b663cba4de015ca47903f49cf7165a10, type: 3}
+  - enemyPrefab: {fileID: 5576281405834939419, guid: ddd60323799afac458f42b8a9dd50c70, type: 3}
     localOffset: {x: -6, y: 2}
     delay: 3
-  - enemyPrefab: {fileID: 5576281405834939419, guid: b663cba4de015ca47903f49cf7165a10, type: 3}
+  - enemyPrefab: {fileID: 5576281405834939419, guid: ddd60323799afac458f42b8a9dd50c70, type: 3}
     localOffset: {x: 6, y: 2}
     delay: 0
-  - enemyPrefab: {fileID: 5576281405834939419, guid: b663cba4de015ca47903f49cf7165a10, type: 3}
+  - enemyPrefab: {fileID: 5576281405834939419, guid: ddd60323799afac458f42b8a9dd50c70, type: 3}
     localOffset: {x: 8, y: 2}
     delay: 0
   - enemyPrefab: {fileID: 4914019361791870253, guid: 04ce0418552ac87448280eebbe5c0c82, type: 3}
-    localOffset: {x: 10, y: 2}
+    localOffset: {x: 12, y: 2}
     delay: 0
   - enemyPrefab: {fileID: 4914019361791870253, guid: 04ce0418552ac87448280eebbe5c0c82, type: 3}
-    localOffset: {x: -8, y: 2}
+    localOffset: {x: -10, y: 2}
+    delay: 3
+  - enemyPrefab: {fileID: 4914019361791870253, guid: 04ce0418552ac87448280eebbe5c0c82, type: 3}
+    localOffset: {x: -12, y: 2}
+    delay: 3
+  - enemyPrefab: {fileID: 4914019361791870253, guid: 04ce0418552ac87448280eebbe5c0c82, type: 3}
+    localOffset: {x: 14, y: 2}
     delay: 3
