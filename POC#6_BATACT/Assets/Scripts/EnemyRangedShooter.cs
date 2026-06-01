@@ -9,14 +9,17 @@ public class EnemyRangedShooter : MonoBehaviour
 
     [Header("Movement")]
     [SerializeField] private float moveSpeed = 2.5f;
-    [SerializeField] private float stopDistance = 5.5f;
-    [SerializeField] private float retreatDistance = 2.5f;
+    [SerializeField] private float stopDistance = 6.0f;
+    [SerializeField] private float retreatDistance = 3.5f;
     [SerializeField] private float acceleration = 25f;
 
-    [Header("Shooting")]
-    [SerializeField] private GameObject projectilePrefab;
+    [Header("Arc Shooting")]
+    [SerializeField] private GameObject arcProjectilePrefab;
+    [SerializeField] private GameObject warningMarkerPrefab;
+    [SerializeField] private float chargeDuration = 1.0f;
+    [SerializeField] private float timeOfFlight = 1.5f;
+    [SerializeField] private float fireRate = 2.5f;
     [SerializeField] private Transform firePoint;
-    [SerializeField] private float fireRate = 2f;
 
     [Header("Visual")]
     [SerializeField] private Transform visualRoot;
@@ -24,6 +27,11 @@ public class EnemyRangedShooter : MonoBehaviour
     private Rigidbody2D body;
     private float fireCooldown;
     private int facingSign = 1;
+
+    private enum State { Moving, Charging }
+    private State currentState = State.Moving;
+    private float chargeTimer;
+    private Vector2 lockedTargetPosition;
 
     private void Awake()
     {
@@ -42,14 +50,31 @@ public class EnemyRangedShooter : MonoBehaviour
 
     private void Update()
     {
-        if (fireCooldown > 0f) fireCooldown -= Time.deltaTime;
+        if (currentState == State.Moving && fireCooldown > 0f) 
+        {
+            fireCooldown -= Time.deltaTime;
+        }
+        
+        if (currentState == State.Charging)
+        {
+            chargeTimer -= Time.deltaTime;
+            if (chargeTimer <= 0f)
+            {
+                FireArcProjectile();
+                currentState = State.Moving;
+                fireCooldown = fireRate;
+            }
+        }
     }
 
     private void FixedUpdate()
     {
-        if (target == null)
+        if (target == null || currentState == State.Charging)
         {
             Decelerate();
+            
+            // Still face target while charging if desired, or keep locked. Let's keep facing locked to avoid moonwalking.
+            UpdateVisualFacing();
             return;
         }
 
@@ -81,7 +106,7 @@ public class EnemyRangedShooter : MonoBehaviour
         // Shooting logic
         if (distanceTotal <= stopDistance + 1f && fireCooldown <= 0f)
         {
-            Shoot();
+            StartCharge();
         }
     }
 
@@ -96,15 +121,58 @@ public class EnemyRangedShooter : MonoBehaviour
         body.linearVelocity = new Vector2(nextVelocityX, body.linearVelocity.y);
     }
 
-    private void Shoot()
+    private void StartCharge()
     {
-        fireCooldown = fireRate;
-        if (projectilePrefab != null && firePoint != null)
+        currentState = State.Charging;
+        chargeTimer = chargeDuration;
+        lockedTargetPosition = target.position;
+
+        // Ground check for marker (cast down from target)
+        Vector2 markerPos = lockedTargetPosition;
+        RaycastHit2D hit = Physics2D.Raycast(lockedTargetPosition, Vector2.down, 5f, LayerMask.GetMask("Ground"));
+        if (hit.collider != null)
         {
-            Vector2 direction = ((Vector2)target.position - (Vector2)firePoint.position).normalized;
-            float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
+            markerPos = hit.point;
+        }
+        else
+        {
+            // If no ground immediately below, just use player feet level roughly
+            markerPos.y -= 0.5f;
+        }
+
+        lockedTargetPosition = markerPos; // projectile aims for the marker
+
+        if (warningMarkerPrefab != null)
+        {
+            GameObject marker = Instantiate(warningMarkerPrefab, markerPos, Quaternion.identity);
+            ProjectileWarningMarker warn = marker.GetComponent<ProjectileWarningMarker>();
+            if (warn != null) warn.ShowWarning(chargeDuration);
+        }
+    }
+
+    private void FireArcProjectile()
+    {
+        if (arcProjectilePrefab != null && firePoint != null)
+        {
+            GameObject proj = Instantiate(arcProjectilePrefab, firePoint.position, Quaternion.identity);
+            EnemyArcProjectile2D arcProj = proj.GetComponent<EnemyArcProjectile2D>();
             
-            Instantiate(projectilePrefab, firePoint.position, Quaternion.Euler(0f, 0f, angle));
+            if (arcProj != null)
+            {
+                Rigidbody2D projBody = proj.GetComponent<Rigidbody2D>();
+                float gravity = Physics2D.gravity.y * projBody.gravityScale;
+                
+                // Calculate required velocity
+                Vector2 startPos = firePoint.position;
+                float dx = lockedTargetPosition.x - startPos.x;
+                float dy = lockedTargetPosition.y - startPos.y;
+                
+                // timeOfFlight is T
+                float vx = dx / timeOfFlight;
+                float vy = (dy - 0.5f * gravity * timeOfFlight * timeOfFlight) / timeOfFlight;
+                
+                arcProj.Initialize(new Vector2(vx, vy));
+            }
         }
     }
 

@@ -169,7 +169,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 42d253b8ed2f127449a415b8a1af6827, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PrototypeEnemyHitReceiver
-  maxHealth: 60
+  maxHealth: 150
   destroyOnDeath: 1
   deathDestroyDelay: 0.05
   dieBelowY: 1
@@ -242,9 +242,12 @@ MonoBehaviour:
   stopDistance: 6
   retreatDistance: 3.5
   acceleration: 25
-  projectilePrefab: {fileID: 6907261828716925171, guid: 812bc9633104b604ea1d70c59c7b56d7, type: 3}
+  arcProjectilePrefab: {fileID: 2406450254212084382, guid: 8c23be1dc2deca14e98555ff5b233822, type: 3}
+  warningMarkerPrefab: {fileID: 5507661068565493467, guid: 9e10f4bc5ab896549b847a6436dee098, type: 3}
+  chargeDuration: 1
+  timeOfFlight: 1.5
+  fireRate: 2.5
   firePoint: {fileID: 3170466966191169889}
-  fireRate: 2
   visualRoot: {fileID: 0}
 --- !u!60 &4241848287439381520
 PolygonCollider2D:
