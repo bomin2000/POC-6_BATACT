@@ -499,6 +499,7 @@ GameObject:
   - component: {fileID: 2746492399404766922}
   - component: {fileID: 2203174731317011125}
   - component: {fileID: -4791114409827709881}
+  - component: {fileID: -1273536668962164304}
   m_Layer: 6
   m_Name: Player
   m_TagString: Untagged
@@ -792,6 +793,37 @@ MonoBehaviour:
   scissorsRadius: 2.5
   probeRadius: 0.2
   maxPushDelta: 0.5
+  jumpKey: 32
+  floorVaultUpImpulse: 18
+  wallVaultSideImpulse: 15
+  wallVaultUpImpulse: 14
+  vaultCooldown: 0.4
+--- !u!114 &-1273536668962164304
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4615884595108132435}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 10d1772e483fab2488de590a8b0c53ef, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerWallSlideAssist
+  isActive: 1
+  attackKey: 323
+  wallSlideMaxFallSpeed: 2.5
+  wallSlideAcceleration: 20
+  wallCheckSize: {x: 0.1, y: 0.8}
+  wallCheckDistance: 0.5
+  groundLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  debugIsWallSliding: 0
+  debugWallDirection: 0
+  debugIsHoldingAttack: 0
+  debugIsAirborne: 0
+  debugCurrentFallSpeed: 0
 --- !u!1 &5105635373414431685
 GameObject:
   m_ObjectHideFlags: 0
