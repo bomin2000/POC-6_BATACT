@@ -360,7 +360,11 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         }
         else if (Input.GetKeyDown(boomerangSelectKey))
         {
-            requestedState = WeaponState.Boomerang;
+            // Ignore boomerang select key if it's Mouse1 and we are in BareHand (to prevent overriding morph queue when using Rope launch)
+            if (!(CurrentState == WeaponState.BareHand && boomerangSelectKey == KeyCode.Mouse1))
+            {
+                requestedState = WeaponState.Boomerang;
+            }
         }
 
         if (allowNumberKeyMorph || Application.isEditor)
@@ -453,22 +457,14 @@ public sealed class DualBladeWeaponController : MonoBehaviour
         if (Time.time >= lastAutoAttackTime + currentInterval)
         {
             lastAutoAttackTime = Time.time;
-            if (consecutiveHitCount >= requiredHitsForSecondary)
-            {
-                consecutiveHitCount = 0;
-                FireSecondaryAttack();
-            }
-            else
-            {
-                FirePrimaryAttack();
-            }
+            FirePrimaryAttack();
         }
     }
 
     private void ReadAttackInput()
     {
         bool isKeyDown = Input.GetKeyDown(attackKey);
-        bool isRightClick = Input.GetKeyDown(boomerangSelectKey); // Mouse2 or Mouse1 depending on settings, usually Mouse1 for secondary
+        bool isRightClick = Input.GetKeyDown(KeyCode.Mouse1); // Explicitly Right Click for Combos & Rope Launch
         bool isKeyHeld = Input.GetKey(attackKey); 
 
         if (CurrentState == WeaponState.BareHand)
@@ -488,8 +484,8 @@ public sealed class DualBladeWeaponController : MonoBehaviour
                         playerMovement.StartRopeMove(activeBoomerang.AnchoredPosition);
                     }
                 }
-                // Right Click / Boomerang Select Key: Release anchor and fly
-                else if (isRightClick || Input.GetKeyDown(KeyCode.Mouse1))
+                // Right Click: Release anchor and fly
+                else if (isRightClick)
                 {
                     if (playerMovement != null && playerMovement.IsRopeSwinging)
                     {
@@ -517,23 +513,25 @@ public sealed class DualBladeWeaponController : MonoBehaviour
             consecutiveHitCount = 0;
         }
 
-        if (isKeyDown || (canAutoAttack && isKeyHeld))
+        // Secondary attack handling via Right Click
+        if (isRightClick)
+        {
+            if (consecutiveHitCount >= requiredHitsForSecondary)
+            {
+                consecutiveHitCount = 0;
+                lastAutoAttackTime = Time.time;
+                FireSecondaryAttack();
+            }
+        }
+        // Primary attack handling via Left Click
+        else if (isKeyDown || (canAutoAttack && isKeyHeld))
         {
             if (canAutoAttack) 
             {
                 lastAutoAttackTime = Time.time;
             }
             
-            // Check if we reached the required combo hits to fire the secondary skill
-            if (consecutiveHitCount >= requiredHitsForSecondary)
-            {
-                consecutiveHitCount = 0; // Reset after using skill
-                FireSecondaryAttack();
-            }
-            else
-            {
-                FirePrimaryAttack();
-            }
+            FirePrimaryAttack();
         }
     }
 

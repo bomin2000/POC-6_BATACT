@@ -23,6 +23,7 @@ MonoBehaviour:
   reaction:
     reactionType: 2
     damage: 35
+    partDamageMultiplier: 3
     knockbackForce: 0
     stunSeconds: 1
     taggedDamageMultiplier: 2.5

@@ -19,7 +19,7 @@ public sealed class DualBladeBoomerangProjectile : MonoBehaviour
     [Header("Hit")]
     [SerializeField] private LayerMask targetLayers = ~0;
 
-    private readonly HashSet<Collider2D> hitTargets = new HashSet<Collider2D>();
+    private readonly HashSet<Transform> hitRootTargets = new HashSet<Transform>();
     private readonly HashSet<Rigidbody2D> draggedBodies = new HashSet<Rigidbody2D>();
     private readonly Collider2D[] overlapBuffer = new Collider2D[16];
 
@@ -80,7 +80,7 @@ public sealed class DualBladeBoomerangProjectile : MonoBehaviour
         
         if (lineRenderer != null) lineRenderer.enabled = false;
         
-        hitTargets.Clear();
+        hitRootTargets.Clear();
         draggedBodies.Clear();
 
         if (profile != null && profile.name.Contains("Empowered"))
@@ -239,7 +239,7 @@ public sealed class DualBladeBoomerangProjectile : MonoBehaviour
         if (lineRenderer != null) lineRenderer.enabled = false;
         
         // Clear hit targets so they can be hit (and damaged) again on the return trip
-        hitTargets.Clear();
+        hitRootTargets.Clear();
     }
 
     private void TickCurvedReturn()
@@ -272,13 +272,49 @@ public sealed class DualBladeBoomerangProjectile : MonoBehaviour
         }
 
         int count = Physics2D.OverlapCircleNonAlloc(transform.position, hitProfile.radius, overlapBuffer, targetLayers);
+        
+        Dictionary<Transform, Collider2D> selectedColliders = new Dictionary<Transform, Collider2D>();
+
         for (int i = 0; i < count; i++)
         {
             Collider2D target = overlapBuffer[i];
-            if (target == null || hitTargets.Contains(target))
+            if (target == null) continue;
+
+            Transform root = target.transform.root;
+            if (hitRootTargets.Contains(root)) continue;
+
+            if (!selectedColliders.ContainsKey(root))
             {
-                continue;
+                selectedColliders[root] = target;
             }
+            else
+            {
+                Collider2D existing = selectedColliders[root];
+                ShieldGuardTrait newShield = target.GetComponent<ShieldGuardTrait>();
+                ShieldGuardTrait existingShield = existing.GetComponent<ShieldGuardTrait>();
+
+                Vector3 ownerPos = owner != null ? owner.position : transform.position;
+                bool newIsGuarding = newShield != null && newShield.IsGuarding(ownerPos);
+                bool existingIsGuarding = existingShield != null && existingShield.IsGuarding(ownerPos);
+
+                if (newIsGuarding && !existingIsGuarding)
+                {
+                    selectedColliders[root] = target;
+                }
+                else if (!newIsGuarding && !existingIsGuarding)
+                {
+                    if (target.GetComponent<EnemyBody>() != null)
+                    {
+                        selectedColliders[root] = target;
+                    }
+                }
+            }
+        }
+
+        foreach (var kvp in selectedColliders)
+        {
+            Collider2D target = kvp.Value;
+            Transform root = kvp.Key;
             
             // Check for Anchorable
             if (!returning && !isAnchored)
@@ -297,7 +333,7 @@ public sealed class DualBladeBoomerangProjectile : MonoBehaviour
                     isAnchored = true;
                     anchoredPosition = anchorPos;
                     anchoredTimer = 0f;
-                    hitTargets.Add(target); // Prevent re-triggering on same anchor
+                    hitRootTargets.Add(root); // Prevent re-triggering on same anchor
                     if (lineRenderer != null) lineRenderer.enabled = true;
                     OnAnchoredEvent?.Invoke(anchoredPosition);
                     continue; // Do not apply damage to the anchor
@@ -310,7 +346,7 @@ public sealed class DualBladeBoomerangProjectile : MonoBehaviour
                 continue;
             }
 
-            hitTargets.Add(target);
+            hitRootTargets.Add(root);
 
             // Hook the target for dragging
             Rigidbody2D body = target.GetComponentInParent<Rigidbody2D>();

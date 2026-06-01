@@ -14,7 +14,7 @@ public sealed class WeaponHitbox2D : MonoBehaviour
     [SerializeField] private Color previewColor = new Color(1f, 0.4f, 0f, 0.8f);
 
     private readonly Collider2D[] overlapBuffer = new Collider2D[32];
-    private readonly HashSet<Collider2D> hitThisSwing = new HashSet<Collider2D>();
+    private readonly HashSet<Transform> hitRootsThisSwing = new HashSet<Transform>();
     private Coroutine attackRoutine;
     private WeaponHitboxProfile currentProfile;
     private Transform owner;
@@ -70,7 +70,7 @@ public sealed class WeaponHitbox2D : MonoBehaviour
 
     private IEnumerator AttackRoutine(WeaponHitboxProfile profile, Vector2 attackForward, Func<Vector2> dynamicWorldOffset)
     {
-        hitThisSwing.Clear();
+        hitRootsThisSwing.Clear();
 
         if (profile.startupSeconds > 0f)
         {
@@ -89,7 +89,7 @@ public sealed class WeaponHitbox2D : MonoBehaviour
             yield return new WaitForSeconds(profile.recoverySeconds);
         }
 
-        hitThisSwing.Clear();
+        hitRootsThisSwing.Clear();
         attackRoutine = null;
     }
 
@@ -108,20 +108,53 @@ public sealed class WeaponHitbox2D : MonoBehaviour
             hitCount = Physics2D.OverlapBoxNonAlloc(center, profile.boxSize, angle, overlapBuffer, targetLayers);
         }
 
+        Dictionary<Transform, Collider2D> selectedColliders = new Dictionary<Transform, Collider2D>();
+
         for (int i = 0; i < hitCount; i++)
         {
             Collider2D target = overlapBuffer[i];
-            Debug.Log($"WeaponHitbox2D Hit: {target.name} at center {center}");
-            if (target == null || hitThisSwing.Contains(target))
+            if (target == null) continue;
+            
+            Transform root = target.transform.root;
+            if (hitRootsThisSwing.Contains(root)) continue;
+
+            if (!selectedColliders.ContainsKey(root))
             {
-                continue;
+                selectedColliders[root] = target;
             }
+            else
+            {
+                // Conflict. Pick the one with guarding ShieldGuardTrait if any, else fallback
+                Collider2D existing = selectedColliders[root];
+                ShieldGuardTrait newShield = target.GetComponent<ShieldGuardTrait>();
+                ShieldGuardTrait existingShield = existing.GetComponent<ShieldGuardTrait>();
+
+                Vector3 ownerPos = owner != null ? owner.position : transform.position;
+                bool newIsGuarding = newShield != null && newShield.IsGuarding(ownerPos);
+                bool existingIsGuarding = existingShield != null && existingShield.IsGuarding(ownerPos);
+
+                if (newIsGuarding && !existingIsGuarding)
+                {
+                    selectedColliders[root] = target;
+                }
+                else if (!newIsGuarding && !existingIsGuarding)
+                {
+                    // Prefer EnemyBody (which usually sits on a parent)
+                    if (target.GetComponent<EnemyBody>() != null)
+                    {
+                        selectedColliders[root] = target;
+                    }
+                }
+            }
+        }
+
+        foreach (var kvp in selectedColliders)
+        {
+            Collider2D target = kvp.Value;
+            Transform root = kvp.Key;
 
             IWeaponHitReceiver receiver = target.GetComponentInParent<IWeaponHitReceiver>();
-            if (receiver == null)
-            {
-                continue;
-            }
+            if (receiver == null) continue;
 
             // Prevent attacking through walls
             Vector2 rayOrigin = owner != null ? owner.position : transform.position;
@@ -129,9 +162,8 @@ public sealed class WeaponHitbox2D : MonoBehaviour
             Vector2 dirToTarget = targetPos - rayOrigin;
             float distToTarget = dirToTarget.magnitude;
             
-            // Assume Layer 6 or 8 are terrain/ground (use LayerMask.GetMask or just generic check)
             int obstacleLayerMask = LayerMask.GetMask("Default", "Terrain", "Ground");
-            if (obstacleLayerMask == 0) obstacleLayerMask = 1; // Fallback to Default if layers don't exist
+            if (obstacleLayerMask == 0) obstacleLayerMask = 1;
 
             RaycastHit2D wallHit = Physics2D.Raycast(rayOrigin, dirToTarget.normalized, distToTarget, obstacleLayerMask);
             if (wallHit.collider != null && !wallHit.collider.isTrigger)
@@ -139,7 +171,7 @@ public sealed class WeaponHitbox2D : MonoBehaviour
                 continue; // Blocked by a wall
             }
 
-            hitThisSwing.Add(target);
+            hitRootsThisSwing.Add(root);
             Vector2 impulse = profile.reaction.BuildImpulse(
                 attackForward,
                 owner != null ? owner.position : transform.position,
